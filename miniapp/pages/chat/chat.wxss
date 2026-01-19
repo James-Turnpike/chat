@@ -2,26 +2,30 @@
   display: flex;
   flex-direction: column;
   height: 100vh;
+  background: #f7f7f7;
 }
 .header {
-  padding: 12rpx 24rpx;
-  background: #ffffff;
-  border-bottom: 1rpx solid #eee;
+  padding: 20rpx 28rpx 16rpx;
+  background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 45%, #e3fbf7 100%);
+  border-bottom: 1rpx solid rgba(0, 0, 0, 0.02);
 }
 .title {
-  font-size: 34rpx;
-  color: #2b2b2b;
+  font-size: 36rpx;
+  color: #222222;
+  letter-spacing: 2rpx;
 }
 .messages {
   flex: 1;
   padding: 24rpx 24rpx 12rpx;
   background: #f7f7f7;
+  box-sizing: border-box;
 }
 .msg {
   max-width: 70%;
   margin: 12rpx 0;
   display: flex;
   flex-direction: column;
+  animation: fadeInUp 0.22s ease-out both;
 }
 .msg.other {
   align-self: flex-start;
@@ -40,7 +44,7 @@
   border-radius: 22rpx;
   font-size: 28rpx;
   line-height: 1.5;
-  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.06);
+  box-shadow: 0 4rpx 18rpx rgba(0, 0, 0, 0.06);
 }
 .other .bubble {
   background: #ffffff;
@@ -78,4 +82,18 @@
   background: #6ad3c8;
   color: #ffffff;
   font-size: 28rpx;
+}
+.placeholder {
+  color: #c1c1c1;
+  font-size: 26rpx;
+}
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 16rpx, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
 }

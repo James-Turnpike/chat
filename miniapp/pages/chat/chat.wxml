@@ -2,9 +2,9 @@
   <view class="header">
     <text class="title">Daze 聊天室</text>
   </view>
-  <scroll-view class="messages" scroll-y="true" scroll-with-animation="true" scroll-top="{{scrollTop}}">
+  <scroll-view class="messages" scroll-y="true" scroll-with-animation="true" scroll-into-view="{{lastId}}">
     <block wx:for="{{messages}}" wx:key="id">
-      <view class="msg {{item.self ? 'self' : 'other'}}">
+      <view id="msg-{{item.id}}" class="msg {{item.self ? 'self' : 'other'}}">
         <text class="nick">{{item.nick}}</text>
         <view class="bubble"><text>{{item.text}}</text></view>
         <text class="time">{{item.time}}</text>
@@ -12,7 +12,16 @@
     </block>
   </scroll-view>
   <view class="input-bar">
-    <input class="input" type="text" placeholder="输入消息..." value="{{inputValue}}" bindinput="onInput"/>
+    <input
+      class="input"
+      type="text"
+      placeholder="输入消息..."
+      placeholder-class="placeholder"
+      confirm-type="send"
+      value="{{inputValue}}"
+      bindinput="onInput"
+      bindconfirm="onSend"
+    />
     <button class="send" bindtap="onSend">发送</button>
   </view>
 </view>
