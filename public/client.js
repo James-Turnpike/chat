@@ -14,18 +14,44 @@ ws.addEventListener('message', e => {
   const wrap = document.createElement('div')
   const self = data.nick === nick
   wrap.className = 'msg ' + (self ? 'self' : 'other')
+
+  // Generate avatar
+  const avatar = document.createElement('div')
+  avatar.className = 'avatar'
+  let hash = 0
+  for (let i = 0; i < data.nick.length; i++) {
+    hash = data.nick.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  const c = (hash & 0x00FFFFFF).toString(16).toUpperCase()
+  avatar.style.background = '#' + ('00000' + c).substr(-6)
+  avatar.textContent = data.nick[0] ? data.nick[0].toUpperCase() : '?'
+
+  const content = document.createElement('div')
+  content.className = 'content'
+
   const nickEl = document.createElement('div')
   nickEl.className = 'nick'
   nickEl.textContent = data.nick
+
+  const bubbleRow = document.createElement('div')
+  bubbleRow.className = 'bubble-row'
+
   const bubble = document.createElement('div')
   bubble.className = 'bubble'
   bubble.textContent = data.text
+
   const time = document.createElement('div')
   time.className = 'time'
   time.textContent = data.time
-  wrap.appendChild(nickEl)
-  wrap.appendChild(bubble)
-  wrap.appendChild(time)
+
+  bubbleRow.appendChild(bubble)
+  bubbleRow.appendChild(time)
+
+  content.appendChild(nickEl)
+  content.appendChild(bubbleRow)
+
+  wrap.appendChild(avatar)
+  wrap.appendChild(content)
   list.appendChild(wrap)
   list.scrollTop = list.scrollHeight
 })

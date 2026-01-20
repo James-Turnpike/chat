@@ -24,6 +24,14 @@ Page({
       this.socket = null
     }
   },
+  getAvatarColor(nick) {
+    let hash = 0
+    for (let i = 0; i < nick.length; i++) {
+      hash = nick.charCodeAt(i) + ((hash << 5) - hash)
+    }
+    const c = (hash & 0x00FFFFFF).toString(16).toUpperCase()
+    return '#' + ('00000' + c).substr(-6)
+  },
   connect() {
     if (this.socket) {
       this.socket.close()
@@ -44,7 +52,11 @@ Page({
       }
       const self = msg.nick === this.data.nick
       const id = msg.id || Date.now().toString(36)
-      const item = { id, nick: msg.nick, text: msg.text, time: msg.time, self }
+      // Generate avatar props
+      const avatarColor = this.getAvatarColor(msg.nick)
+      const avatarChar = msg.nick[0] ? msg.nick[0].toUpperCase() : '?'
+      
+      const item = { id, nick: msg.nick, text: msg.text, time: msg.time, self, avatarColor, avatarChar }
       const list = this.data.messages.concat(item)
       this.setData({
         messages: list,

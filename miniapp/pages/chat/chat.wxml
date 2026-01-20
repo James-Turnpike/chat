@@ -3,11 +3,19 @@
     <text class="title">Daze 聊天室</text>
   </view>
   <scroll-view class="messages" scroll-y="true" scroll-with-animation="true" scroll-into-view="{{lastId}}">
+    <view wx:if="{{messages.length === 0}}" class="empty-state">
+      <text>暂无消息，快来聊聊吧~</text>
+    </view>
     <block wx:for="{{messages}}" wx:key="id">
       <view id="msg-{{item.id}}" class="msg {{item.self ? 'self' : 'other'}}">
-        <text class="nick">{{item.nick}}</text>
-        <view class="bubble"><text>{{item.text}}</text></view>
-        <text class="time">{{item.time}}</text>
+        <view class="avatar" style="background: {{item.avatarColor}}">{{item.avatarChar}}</view>
+        <view class="content">
+          <view class="nick">{{item.nick}}</view>
+          <view class="bubble-row">
+            <view class="bubble"><text>{{item.text}}</text></view>
+            <text class="time">{{item.time}}</text>
+          </view>
+        </view>
       </view>
     </block>
   </scroll-view>
