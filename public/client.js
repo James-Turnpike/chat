@@ -4,6 +4,11 @@ const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') +
 const input = document.getElementById('input')
 const send = document.getElementById('send')
 const list = document.getElementById('messages')
+send.disabled = true
+input.addEventListener('input', () => {
+  const t = input.value.trim()
+  send.disabled = t.length === 0
+})
 ws.addEventListener('message', e => {
   let data
   try {
@@ -39,10 +44,19 @@ ws.addEventListener('message', e => {
   const bubble = document.createElement('div')
   bubble.className = 'bubble'
   bubble.textContent = data.text
+  bubble.title = '双击复制'
+  bubble.addEventListener('dblclick', () => {
+    navigator.clipboard && navigator.clipboard.writeText(data.text)
+  })
 
   const time = document.createElement('div')
   time.className = 'time'
-  time.textContent = data.time
+  const ts = typeof data.ts === 'number' ? data.ts : Date.now()
+  const d = new Date(ts)
+  const pad = n => (n < 10 ? '0' + n : '' + n)
+  const now = new Date()
+  const sameDay = d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()
+  time.textContent = sameDay ? pad(d.getHours()) + ':' + pad(d.getMinutes()) : (pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()))
 
   bubbleRow.appendChild(bubble)
   bubbleRow.appendChild(time)

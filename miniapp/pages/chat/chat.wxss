@@ -9,6 +9,15 @@
   background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 45%, #e3fbf7 100%);
   border-bottom: 1rpx solid rgba(0, 0, 0, 0.02);
 }
+.status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 60rpx;
+  margin: 12rpx 0;
+  color: #7a7a7a;
+  font-size: 24rpx;
+}
 .title {
   font-size: 36rpx;
   color: #222222;
@@ -125,6 +134,10 @@
   background: #6ad3c8;
   color: #ffffff;
   font-size: 28rpx;
+}
+.send.disabled {
+  background: #bcded9;
+  color: #f6f6f6;
 }
 .placeholder {
   color: #c1c1c1;

@@ -5,7 +5,8 @@ Page({
     inputValue: '',
     nick: '',
     lastId: '',
-    connected: false
+    connected: false,
+    focus: false
   },
   onLoad() {
     const stored = wx.getStorageSync('nick')
@@ -56,7 +57,8 @@ Page({
       const avatarColor = this.getAvatarColor(msg.nick)
       const avatarChar = msg.nick[0] ? msg.nick[0].toUpperCase() : '?'
       
-      const item = { id, nick: msg.nick, text: msg.text, time: msg.time, self, avatarColor, avatarChar }
+      const timeStr = this.formatTime(msg.ts) || msg.time
+      const item = { id, nick: msg.nick, text: msg.text, time: timeStr, self, avatarColor, avatarChar }
       const list = this.data.messages.concat(item)
       this.setData({
         messages: list,
@@ -91,6 +93,23 @@ Page({
     }
     const payload = JSON.stringify({ nick: this.data.nick, text })
     this.socket.send({ data: payload })
-    this.setData({ inputValue: '' })
+    this.setData({ inputValue: '', focus: true })
+  },
+  formatTime(ts) {
+    if (!ts) return ''
+    const d = new Date(ts)
+    const now = new Date()
+    const pad = n => (n < 10 ? '0' + n : '' + n)
+    const isSameDay =
+      d.getFullYear() === now.getFullYear() &&
+      d.getMonth() === now.getMonth() &&
+      d.getDate() === now.getDate()
+    if (isSameDay) return pad(d.getHours()) + ':' + pad(d.getMinutes())
+    return pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes())
+  },
+  onCopy(e) {
+    const text = e.currentTarget.dataset.text || ''
+    if (!text) return
+    wx.setClipboardData({ data: text })
   }
 })

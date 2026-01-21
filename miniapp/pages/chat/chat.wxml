@@ -3,6 +3,9 @@
     <text class="title">Daze 聊天室</text>
   </view>
   <scroll-view class="messages" scroll-y="true" scroll-with-animation="true" scroll-into-view="{{lastId}}">
+    <view wx:if="{{!connected}}" class="status-bar">
+      <text>连接中...</text>
+    </view>
     <view wx:if="{{messages.length === 0}}" class="empty-state">
       <text>暂无消息，快来聊聊吧~</text>
     </view>
@@ -12,7 +15,7 @@
         <view class="content">
           <view class="nick">{{item.nick}}</view>
           <view class="bubble-row">
-            <view class="bubble"><text>{{item.text}}</text></view>
+            <view class="bubble" bindlongpress="onCopy" data-text="{{item.text}}"><text>{{item.text}}</text></view>
             <text class="time">{{item.time}}</text>
           </view>
         </view>
@@ -26,10 +29,11 @@
       placeholder="输入消息..."
       placeholder-class="placeholder"
       confirm-type="send"
+      focus="{{focus}}"
       value="{{inputValue}}"
       bindinput="onInput"
       bindconfirm="onSend"
     />
-    <button class="send" bindtap="onSend">发送</button>
+    <button class="send {{!inputValue || !connected ? 'disabled' : ''}}" bindtap="onSend" disabled="{{!inputValue || !connected}}">发送</button>
   </view>
 </view>

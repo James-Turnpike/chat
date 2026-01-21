@@ -32,7 +32,8 @@ wss.on('connection', ws => {
       id: Date.now().toString(36) + Math.random().toString(16).slice(2),
       nick: String(data.nick || ''),
       text: String(data.text || ''),
-      time: new Date().toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit' })
+      time: new Date().toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit' }),
+      ts: Date.now()
     }
     const str = JSON.stringify(payload)
     clients.forEach(c => {
