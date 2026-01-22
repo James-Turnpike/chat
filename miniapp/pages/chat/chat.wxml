@@ -1,5 +1,5 @@
 <view class="page">
-  <view class="header">
+  <view class="header" bindtap="scrollToBottom">
     <text class="title">Daze 聊天室</text>
   </view>
   <scroll-view class="messages" scroll-y="true" scroll-with-animation="true" scroll-into-view="{{lastId}}">

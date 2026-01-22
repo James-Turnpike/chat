@@ -94,6 +94,7 @@ Page({
     const payload = JSON.stringify({ nick: this.data.nick, text })
     this.socket.send({ data: payload })
     this.setData({ inputValue: '', focus: true })
+    if (wx.vibrateShort) wx.vibrateShort()
   },
   formatTime(ts) {
     if (!ts) return ''
@@ -111,5 +112,11 @@ Page({
     const text = e.currentTarget.dataset.text || ''
     if (!text) return
     wx.setClipboardData({ data: text })
+  },
+  scrollToBottom() {
+    const list = this.data.messages
+    if (!list || !list.length) return
+    const last = list[list.length - 1]
+    this.setData({ lastId: 'msg-' + last.id })
   }
 })

@@ -28,6 +28,7 @@
   padding: 24rpx;
   background: #f7f7f7;
   box-sizing: border-box;
+  padding-bottom: 36rpx;
 }
 .empty-state {
   display: flex;
@@ -117,6 +118,8 @@
   padding: 12rpx;
   background: #ffffff;
   border-top: 1rpx solid #eee;
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-bottom: constant(safe-area-inset-bottom);
 }
 .input {
   flex: 1;
