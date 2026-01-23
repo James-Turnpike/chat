@@ -30,6 +30,7 @@
       placeholder-class="placeholder"
       confirm-type="send"
       focus="{{focus}}"
+      maxlength="500"
       value="{{inputValue}}"
       bindinput="onInput"
       bindconfirm="onSend"
