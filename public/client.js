@@ -4,10 +4,12 @@ const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') +
 const input = document.getElementById('input')
 const send = document.getElementById('send')
 const list = document.getElementById('messages')
+const counter = document.getElementById('counter')
 send.disabled = true
 input.addEventListener('input', () => {
   const t = input.value.trim()
   send.disabled = t.length === 0
+  if (counter) counter.textContent = (t.length) + '/500'
 })
 ws.addEventListener('message', e => {
   let data

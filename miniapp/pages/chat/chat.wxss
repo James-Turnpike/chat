@@ -93,7 +93,8 @@
   line-height: 1.5;
   box-shadow: 0 4rpx 18rpx rgba(0, 0, 0, 0.06);
   position: relative;
-  word-break: break-all;
+  word-break: break-word;
+  white-space: pre-wrap;
 }
 .other .bubble {
   background: #ffffff;
@@ -138,9 +139,17 @@
   color: #ffffff;
   font-size: 28rpx;
 }
+.send:active {
+  background: #5cc8be;
+}
 .send.disabled {
   background: #bcded9;
   color: #f6f6f6;
+}
+.counter {
+  margin: 0 12rpx;
+  color: #b0b0b0;
+  font-size: 22rpx;
 }
 .placeholder {
   color: #c1c1c1;

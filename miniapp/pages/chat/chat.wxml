@@ -35,6 +35,7 @@
       bindinput="onInput"
       bindconfirm="onSend"
     />
+    <text class="counter" wx:if="{{inputValue.length > 0}}">{{inputValue.length}}/500</text>
     <button class="send {{!inputValue || !connected ? 'disabled' : ''}}" bindtap="onSend" disabled="{{!inputValue || !connected}}">发送</button>
   </view>
 </view>
