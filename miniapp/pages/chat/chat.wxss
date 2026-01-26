@@ -30,6 +30,19 @@
   box-sizing: border-box;
   padding-bottom: 36rpx;
 }
+.day-sep {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 16rpx 0;
+}
+.sep {
+  background: #ececec;
+  color: #7a7a7a;
+  font-size: 22rpx;
+  padding: 8rpx 16rpx;
+  border-radius: 20rpx;
+}
 .empty-state {
   display: flex;
   justify-content: center;
@@ -150,6 +163,12 @@
   margin: 0 12rpx;
   color: #b0b0b0;
   font-size: 22rpx;
+}
+.counter.warn {
+  color: #e6a700;
+}
+.counter.danger {
+  color: #d93025;
 }
 .placeholder {
   color: #c1c1c1;

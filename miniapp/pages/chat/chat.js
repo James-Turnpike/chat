@@ -6,7 +6,8 @@ Page({
     nick: '',
     lastId: '',
     connected: false,
-    focus: false
+    focus: false,
+    counterLevel: ''
   },
   onLoad() {
     const stored = wx.getStorageSync('nick')
@@ -56,15 +57,27 @@ Page({
       // Generate avatar props
       const avatarColor = this.getAvatarColor(msg.nick)
       const avatarChar = msg.nick[0] ? msg.nick[0].toUpperCase() : '?'
-      
-      const timeStr = this.formatTime(msg.ts) || msg.time
+      const day = this.dayKey(msg.ts)
+      let list = this.data.messages.slice()
+      let lastDay = ''
+      for (let i = list.length - 1; i >= 0; i--) {
+        const it = list[i]
+        if (it && it.type !== 'sep') {
+          lastDay = this.dayKey(it.ts)
+          break
+        }
+      }
+      if (day && day !== lastDay) {
+        const sepId = 'sep-' + day
+        list.push({ id: sepId, type: 'sep', label: day })
+      }
+      const item = { id, nick: msg.nick, text: msg.text, time: timeStr, self, avatarColor, avatarChar, ts: msg.ts }
+      list = list.concat(item)
       const item = { id, nick: msg.nick, text: msg.text, time: timeStr, self, avatarColor, avatarChar }
       const list = this.data.messages.concat(item)
       this.setData({
         messages: list,
         lastId: 'msg-' + id
-      })
-    })
     socket.onClose(() => {
       this.setData({ connected: false })
       this.scheduleReconnect()
@@ -82,7 +95,12 @@ Page({
     }, 2000)
   },
   onInput(e) {
-    this.setData({ inputValue: e.detail.value })
+    const v = e.detail.value || ''
+    let level = ''
+    const len = v.length
+    if (len > 490) level = 'danger'
+    else if (len > 400) level = 'warn'
+    this.setData({ inputValue: v, counterLevel: level })
   },
   onSend() {
     const text = this.data.inputValue.trim()
@@ -107,6 +125,12 @@ Page({
       d.getDate() === now.getDate()
     if (isSameDay) return pad(d.getHours()) + ':' + pad(d.getMinutes())
     return pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes())
+  },
+  dayKey(ts) {
+    if (!ts) return ''
+    const d = new Date(ts)
+    const pad = n => (n < 10 ? '0' + n : '' + n)
+    return pad(d.getMonth() + 1) + '-' + pad(d.getDate())
   },
   onCopy(e) {
     const text = e.currentTarget.dataset.text || ''

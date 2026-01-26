@@ -24,5 +24,9 @@ body{margin:0;background:#f7f7f7;color:#2b2b2b;font-family:-apple-system,BlinkMa
 .send:disabled{background:#bcded9;color:#f6f6f6;cursor:not-allowed}
 .input::placeholder{color:#c1c1c1}
 .counter{margin:0 8px;color:#b0b0b0;font-size:12px}
+.counter.warn{color:#e6a700}
+.counter.danger{color:#d93025}
+.day-sep{display:flex;justify-content:center;align-items:center;margin:10px 0}
+.day-sep .sep{background:#ececec;color:#7a7a7a;font-size:12px;padding:4px 10px;border-radius:14px}
 .bubble{white-space:pre-wrap;word-break:break-word}
 @keyframes fadeInUp{from{opacity:0;transform:translate3d(0,8px,0)}to{opacity:1;transform:translate3d(0,0,0)}}

@@ -5,11 +5,15 @@ const input = document.getElementById('input')
 const send = document.getElementById('send')
 const list = document.getElementById('messages')
 const counter = document.getElementById('counter')
+let lastDay = ''
 send.disabled = true
 input.addEventListener('input', () => {
   const t = input.value.trim()
   send.disabled = t.length === 0
-  if (counter) counter.textContent = (t.length) + '/500'
+  if (counter) {
+    counter.textContent = (t.length) + '/500'
+    counter.className = 'counter' + (t.length > 490 ? ' danger' : (t.length > 400 ? ' warn' : ''))
+  }
 })
 ws.addEventListener('message', e => {
   let data
@@ -17,6 +21,20 @@ ws.addEventListener('message', e => {
     data = JSON.parse(e.data)
   } catch (err) {
     return
+  }
+  const ts = typeof data.ts === 'number' ? data.ts : Date.now()
+  const d = new Date(ts)
+  const pad = n => (n < 10 ? '0' + n : '' + n)
+  const day = pad(d.getMonth() + 1) + '-' + pad(d.getDate())
+  if (day !== lastDay) {
+    const sep = document.createElement('div')
+    sep.className = 'day-sep'
+    const t = document.createElement('div')
+    t.className = 'sep'
+    t.textContent = day
+    sep.appendChild(t)
+    list.appendChild(sep)
+    lastDay = day
   }
   const wrap = document.createElement('div')
   const self = data.nick === nick
@@ -53,9 +71,6 @@ ws.addEventListener('message', e => {
 
   const time = document.createElement('div')
   time.className = 'time'
-  const ts = typeof data.ts === 'number' ? data.ts : Date.now()
-  const d = new Date(ts)
-  const pad = n => (n < 10 ? '0' + n : '' + n)
   const now = new Date()
   const sameDay = d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()
   time.textContent = sameDay ? pad(d.getHours()) + ':' + pad(d.getMinutes()) : (pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()))

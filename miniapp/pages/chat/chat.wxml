@@ -10,16 +10,21 @@
       <text>暂无消息，快来聊聊吧~</text>
     </view>
     <block wx:for="{{messages}}" wx:key="id">
-      <view id="msg-{{item.id}}" class="msg {{item.self ? 'self' : 'other'}}">
-        <view class="avatar" style="background: {{item.avatarColor}}">{{item.avatarChar}}</view>
-        <view class="content">
-          <view class="nick">{{item.nick}}</view>
-          <view class="bubble-row">
-            <view class="bubble" bindlongpress="onCopy" data-text="{{item.text}}"><text>{{item.text}}</text></view>
-            <text class="time">{{item.time}}</text>
+      <block wx:if="{{item.type === 'sep'}}">
+        <view id="msg-{{item.id}}" class="day-sep"><text class="sep">{{item.label}}</text></view>
+      </block>
+      <block wx:else>
+        <view id="msg-{{item.id}}" class="msg {{item.self ? 'self' : 'other'}}">
+          <view class="avatar" style="background: {{item.avatarColor}}">{{item.avatarChar}}</view>
+          <view class="content">
+            <view class="nick">{{item.nick}}</view>
+            <view class="bubble-row">
+              <view class="bubble" bindlongpress="onCopy" data-text="{{item.text}}"><text>{{item.text}}</text></view>
+              <text class="time">{{item.time}}</text>
+            </view>
           </view>
         </view>
-      </view>
+      </block>
     </block>
   </scroll-view>
   <view class="input-bar">
@@ -35,7 +40,7 @@
       bindinput="onInput"
       bindconfirm="onSend"
     />
-    <text class="counter" wx:if="{{inputValue.length > 0}}">{{inputValue.length}}/500</text>
+    <text class="counter {{counterLevel}}" wx:if="{{inputValue.length > 0}}">{{inputValue.length}}/500</text>
     <button class="send {{!inputValue || !connected ? 'disabled' : ''}}" bindtap="onSend" disabled="{{!inputValue || !connected}}">发送</button>
   </view>
 </view>
