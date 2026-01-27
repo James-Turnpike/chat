@@ -54,9 +54,9 @@ Page({
       }
       const self = msg.nick === this.data.nick
       const id = msg.id || Date.now().toString(36)
-      // Generate avatar props
       const avatarColor = this.getAvatarColor(msg.nick)
       const avatarChar = msg.nick[0] ? msg.nick[0].toUpperCase() : '?'
+      const timeStr = this.formatTime(msg.ts) || msg.time
       const day = this.dayKey(msg.ts)
       let list = this.data.messages.slice()
       let lastDay = ''
@@ -71,13 +71,15 @@ Page({
         const sepId = 'sep-' + day
         list.push({ id: sepId, type: 'sep', label: day })
       }
-      const item = { id, nick: msg.nick, text: msg.text, time: timeStr, self, avatarColor, avatarChar, ts: msg.ts }
-      list = list.concat(item)
-      const item = { id, nick: msg.nick, text: msg.text, time: timeStr, self, avatarColor, avatarChar }
-      const list = this.data.messages.concat(item)
+      list.push({ id, nick: msg.nick, text: msg.text, time: timeStr, self, avatarColor, avatarChar, ts: msg.ts })
+      if (list.length > 200) {
+        list = list.slice(list.length - 200)
+      }
       this.setData({
         messages: list,
         lastId: 'msg-' + id
+      })
+    })
     socket.onClose(() => {
       this.setData({ connected: false })
       this.scheduleReconnect()
@@ -136,6 +138,7 @@ Page({
     const text = e.currentTarget.dataset.text || ''
     if (!text) return
     wx.setClipboardData({ data: text })
+    wx.showToast({ title: '已复制', icon: 'none' })
   },
   scrollToBottom() {
     const list = this.data.messages

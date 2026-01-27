@@ -28,10 +28,15 @@ wss.on('connection', ws => {
     } catch (e) {
       return
     }
+    const nickRaw = String(data.nick || '')
+    const textRaw = String(data.text || '')
+    const nick = nickRaw.slice(0, 20)
+    const text = textRaw.replace(/\s+$/,'').slice(0, 500)
+    if (!text) return
     const payload = {
       id: Date.now().toString(36) + Math.random().toString(16).slice(2),
-      nick: String(data.nick || ''),
-      text: String(data.text || ''),
+      nick,
+      text,
       time: new Date().toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit' }),
       ts: Date.now()
     }
