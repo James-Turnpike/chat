@@ -27,12 +27,35 @@ Page({
     }
   },
   getAvatarColor(nick) {
+    if (!this._colorCache) this._colorCache = {}
+    if (this._colorCache[nick]) return this._colorCache[nick]
     let hash = 0
     for (let i = 0; i < nick.length; i++) {
       hash = nick.charCodeAt(i) + ((hash << 5) - hash)
     }
-    const c = (hash & 0x00FFFFFF).toString(16).toUpperCase()
-    return '#' + ('00000' + c).substr(-6)
+    const hue = Math.abs(hash) % 360
+    const color = this.hslToHex(hue, 45, 78)
+    this._colorCache[nick] = color
+    return color
+  },
+  hslToHex(h, s, l) {
+    s /= 100
+    l /= 100
+    const c = (1 - Math.abs(2 * l - 1)) * s
+    const x = c * (1 - Math.abs(((h / 60) % 2) - 1))
+    const m = l - c / 2
+    let r = 0, g = 0, b = 0
+    if (0 <= h && h < 60) { r = c; g = x; b = 0 }
+    else if (60 <= h && h < 120) { r = x; g = c; b = 0 }
+    else if (120 <= h && h < 180) { r = 0; g = c; b = x }
+    else if (180 <= h && h < 240) { r = 0; g = x; b = c }
+    else if (240 <= h && h < 300) { r = x; g = 0; b = c }
+    else { r = c; g = 0; b = x }
+    const toHex = v => {
+      const hv = Math.round((v + m) * 255).toString(16).padStart(2, '0')
+      return hv
+    }
+    return '#' + toHex(r) + toHex(g) + toHex(b)
   },
   connect() {
     if (this.socket) {
@@ -43,7 +66,7 @@ Page({
     this.socket = socket
     this.setData({ connected: false })
     socket.onOpen(() => {
-      this.setData({ connected: true })
+      this.setData({ connected: true, focus: true })
     })
     socket.onMessage(res => {
       let msg
