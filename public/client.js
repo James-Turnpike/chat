@@ -5,17 +5,31 @@ const input = document.getElementById('input')
 const send = document.getElementById('send')
 const list = document.getElementById('messages')
 const counter = document.getElementById('counter')
+const clearBtn = document.getElementById('clear')
 let lastDay = ''
 const colorCache = {}
 send.disabled = true
 input.addEventListener('input', () => {
   const t = input.value.trim()
-  send.disabled = t.length === 0
+  send.disabled = t.length === 0 || ws.readyState !== 1
   if (counter) {
     counter.textContent = (t.length) + '/500'
     counter.className = 'counter' + (t.length > 490 ? ' danger' : (t.length > 400 ? ' warn' : ''))
   }
 })
+ws.addEventListener('open', () => {
+  const t = input.value.trim()
+  send.disabled = t.length === 0
+})
+ws.addEventListener('close', () => {
+  send.disabled = true
+})
+if (clearBtn) {
+  clearBtn.addEventListener('click', () => {
+    list.innerHTML = ''
+    lastDay = ''
+  })
+}
 ws.addEventListener('message', e => {
   let data
   try {

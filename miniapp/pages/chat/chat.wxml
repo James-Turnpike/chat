@@ -1,6 +1,7 @@
 <view class="page">
   <view class="header" bindtap="scrollToBottom">
     <text class="title">Daze 聊天室</text>
+    <text class="clear" bindtap="onClear">清屏</text>
   </view>
   <scroll-view class="messages" scroll-y="true" scroll-with-animation="true" scroll-into-view="{{lastId}}">
     <view wx:if="{{!connected}}" class="status-bar">

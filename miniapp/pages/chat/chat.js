@@ -168,5 +168,8 @@ Page({
     if (!list || !list.length) return
     const last = list[list.length - 1]
     this.setData({ lastId: 'msg-' + last.id })
+  },
+  onClear() {
+    this.setData({ messages: [], lastId: '', inputValue: '' })
   }
 })
