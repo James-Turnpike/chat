@@ -7,7 +7,12 @@ const list = document.getElementById('messages')
 const counter = document.getElementById('counter')
 const clearBtn = document.getElementById('clear')
 let lastDay = ''
-const colorCache = {}
+let colorCache
+try {
+  colorCache = JSON.parse(localStorage.getItem('colorCache') || '{}')
+} catch (e) {
+  colorCache = {}
+}
 send.disabled = true
 input.addEventListener('input', () => {
   const t = input.value.trim()
@@ -82,6 +87,7 @@ ws.addEventListener('message', e => {
     }
     color = hslToHex(hue, 45, 78)
     colorCache[data.nick] = color
+    try { localStorage.setItem('colorCache', JSON.stringify(colorCache)) } catch (e) {}
   }
   avatar.style.background = color
   avatar.textContent = data.nick[0] ? data.nick[0].toUpperCase() : '?'

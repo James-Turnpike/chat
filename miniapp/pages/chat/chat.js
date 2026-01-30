@@ -10,6 +10,7 @@ Page({
     counterLevel: ''
   },
   onLoad() {
+    this.loadColorCache()
     const stored = wx.getStorageSync('nick')
     const nick = stored || '游客' + Math.floor(Math.random() * 1000)
     wx.setStorageSync('nick', nick)
@@ -27,16 +28,31 @@ Page({
     }
   },
   getAvatarColor(nick) {
+    const key = (nick || '').trim() || '游客'
     if (!this._colorCache) this._colorCache = {}
-    if (this._colorCache[nick]) return this._colorCache[nick]
+    if (this._colorCache[key]) return this._colorCache[key]
     let hash = 0
-    for (let i = 0; i < nick.length; i++) {
-      hash = nick.charCodeAt(i) + ((hash << 5) - hash)
+    for (let i = 0; i < key.length; i++) {
+      hash = key.charCodeAt(i) + ((hash << 5) - hash)
     }
     const hue = Math.abs(hash) % 360
     const color = this.hslToHex(hue, 45, 78)
-    this._colorCache[nick] = color
+    this._colorCache[key] = color
+    this.saveColorCache()
     return color
+  },
+  loadColorCache() {
+    try {
+      const cache = wx.getStorageSync('colorCache')
+      this._colorCache = cache && typeof cache === 'object' ? cache : {}
+    } catch (e) {
+      this._colorCache = {}
+    }
+  },
+  saveColorCache() {
+    try {
+      wx.setStorageSync('colorCache', this._colorCache)
+    } catch (e) {}
   },
   hslToHex(h, s, l) {
     s /= 100
