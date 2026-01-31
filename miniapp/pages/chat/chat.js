@@ -83,6 +83,12 @@ Page({
     this.setData({ connected: false })
     socket.onOpen(() => {
       this.setData({ connected: true, focus: true })
+      if (this._pingTimer) clearInterval(this._pingTimer)
+      this._pingTimer = setInterval(() => {
+        try {
+          this.socket && this.socket.send({ data: '{"type":"ping"}' })
+        } catch (e) {}
+      }, 30000)
     })
     socket.onMessage(res => {
       let msg
@@ -121,10 +127,18 @@ Page({
     })
     socket.onClose(() => {
       this.setData({ connected: false })
+      if (this._pingTimer) {
+        clearInterval(this._pingTimer)
+        this._pingTimer = null
+      }
       this.scheduleReconnect()
     })
     socket.onError(() => {
       this.setData({ connected: false })
+      if (this._pingTimer) {
+        clearInterval(this._pingTimer)
+        this._pingTimer = null
+      }
       this.scheduleReconnect()
     })
   },

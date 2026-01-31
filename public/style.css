@@ -8,7 +8,7 @@ body{margin:0;background:#f7f7f7;color:#2b2b2b;font-family:-apple-system,BlinkMa
 .msg{max-width:85%;margin:12px 0;display:flex;flex-direction:row;animation:fadeInUp .22s ease-out both}
 .msg.self{flex-direction:row-reverse;align-self:flex-end}
 .msg.other{align-self:flex-start}
-.avatar{width:36px;height:36px;border-radius:18px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;font-weight:700;flex-shrink:0;box-shadow:0 2px 6px rgba(0,0,0,.1)}
+.avatar{width:36px;height:36px;border-radius:18px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;font-weight:700;flex-shrink:0;box-shadow:0 2px 6px rgba(0,0,0,.1);border:2px solid rgba(255,255,255,.9)}
 .content{display:flex;flex-direction:column;margin:0 8px;max-width:100%}
 .nick{font-size:12px;color:#9a9a9a;margin-bottom:4px}
 .self .nick{text-align:right}
