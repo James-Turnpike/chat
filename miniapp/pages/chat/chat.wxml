@@ -16,7 +16,7 @@
       </block>
       <block wx:else>
         <view id="msg-{{item.id}}" class="msg {{item.self ? 'self' : 'other'}}">
-          <view class="avatar" style="background: {{item.avatarColor}}">{{item.avatarChar}}</view>
+          <view class="avatar" style="background: {{item.avatarColor}}; color: {{item.avatarTextColor}}">{{item.avatarChar}}</view>
           <view class="content">
             <view class="nick">{{item.nick}}</view>
             <view class="bubble-row">

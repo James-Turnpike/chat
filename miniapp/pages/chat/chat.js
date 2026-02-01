@@ -28,7 +28,7 @@ Page({
     }
   },
   getAvatarColor(nick) {
-    const key = (nick || '').trim() || '游客'
+    const key = ((nick || '').trim().toLowerCase()) || '游客'
     if (!this._colorCache) this._colorCache = {}
     if (this._colorCache[key]) return this._colorCache[key]
     let hash = 0
@@ -40,6 +40,16 @@ Page({
     this._colorCache[key] = color
     this.saveColorCache()
     return color
+  },
+  getAvatarTextColor(hex) {
+    const { r, g, b } = this.hexToRgb(hex)
+    const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
+    return luminance > 0.68 ? '#1a1a1a' : '#ffffff'
+  },
+  hexToRgb(hex) {
+    const h = hex.replace('#', '')
+    const bigint = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16)
+    return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 }
   },
   loadColorCache() {
     try {
@@ -101,6 +111,7 @@ Page({
       const id = msg.id || Date.now().toString(36)
       const avatarColor = this.getAvatarColor(msg.nick)
       const avatarChar = msg.nick[0] ? msg.nick[0].toUpperCase() : '?'
+      const avatarTextColor = this.getAvatarTextColor(avatarColor)
       const timeStr = this.formatTime(msg.ts) || msg.time
       const day = this.dayKey(msg.ts)
       let list = this.data.messages.slice()
@@ -116,7 +127,7 @@ Page({
         const sepId = 'sep-' + day
         list.push({ id: sepId, type: 'sep', label: day })
       }
-      list.push({ id, nick: msg.nick, text: msg.text, time: timeStr, self, avatarColor, avatarChar, ts: msg.ts })
+      list.push({ id, nick: msg.nick, text: msg.text, time: timeStr, self, avatarColor, avatarTextColor, avatarChar, ts: msg.ts })
       if (list.length > 200) {
         list = list.slice(list.length - 200)
       }

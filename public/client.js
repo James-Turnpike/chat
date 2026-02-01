@@ -90,6 +90,12 @@ ws.addEventListener('message', e => {
     try { localStorage.setItem('colorCache', JSON.stringify(colorCache)) } catch (e) {}
   }
   avatar.style.background = color
+  // set readable text color
+  const hex = color.replace('#','')
+  const bigint = parseInt(hex.length === 3 ? hex.split('').map(c => c + c).join('') : hex, 16)
+  const r = (bigint >> 16) & 255, g = (bigint >> 8) & 255, b = bigint & 255
+  const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
+  avatar.style.color = luminance > 0.68 ? '#1a1a1a' : '#ffffff'
   avatar.textContent = data.nick[0] ? data.nick[0].toUpperCase() : '?'
 
   const content = document.createElement('div')
