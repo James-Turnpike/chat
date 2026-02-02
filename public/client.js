@@ -22,17 +22,24 @@ input.addEventListener('input', () => {
     counter.className = 'counter' + (t.length > 490 ? ' danger' : (t.length > 400 ? ' warn' : ''))
   }
 })
+const statusBar = document.getElementById('status')
 ws.addEventListener('open', () => {
   const t = input.value.trim()
   send.disabled = t.length === 0
+  input.placeholder = '输入消息（回车发送）...'
+  if (statusBar) statusBar.style.display = 'none'
+  try { input.focus() } catch (e) {}
 })
 ws.addEventListener('close', () => {
   send.disabled = true
+  input.placeholder = '正在连接...'
+  if (statusBar) statusBar.style.display = 'flex'
 })
 if (clearBtn) {
   clearBtn.addEventListener('click', () => {
     list.innerHTML = ''
     lastDay = ''
+    try { input.focus() } catch (e) {}
   })
 }
 ws.addEventListener('message', e => {

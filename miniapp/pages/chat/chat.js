@@ -93,6 +93,7 @@ Page({
     this.setData({ connected: false })
     socket.onOpen(() => {
       this.setData({ connected: true, focus: true })
+      wx.showToast({ title: '已连接', icon: 'none' })
       if (this._pingTimer) clearInterval(this._pingTimer)
       this._pingTimer = setInterval(() => {
         try {
@@ -211,6 +212,6 @@ Page({
     this.setData({ lastId: 'msg-' + last.id })
   },
   onClear() {
-    this.setData({ messages: [], lastId: '', inputValue: '' })
+    this.setData({ messages: [], lastId: '', inputValue: '', focus: true })
   }
 })
