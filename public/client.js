@@ -70,7 +70,8 @@ ws.addEventListener('message', e => {
   // Generate avatar
   const avatar = document.createElement('div')
   avatar.className = 'avatar'
-  let color = colorCache[data.nick]
+  const key = (data.nick || '').trim().toLowerCase()
+  let color = colorCache[key]
   if (!color) {
     let hash = 0
     for (let i = 0; i < data.nick.length; i++) {
@@ -93,7 +94,7 @@ ws.addEventListener('message', e => {
       return '#' + toHex(r) + toHex(g) + toHex(b)
     }
     color = hslToHex(hue, 45, 78)
-    colorCache[data.nick] = color
+    colorCache[key] = color
     try { localStorage.setItem('colorCache', JSON.stringify(colorCache)) } catch (e) {}
   }
   avatar.style.background = color

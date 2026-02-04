@@ -28,6 +28,7 @@ wss.on('connection', ws => {
     } catch (e) {
       return
     }
+    if (data && data.type === 'ping') return
     const nickRaw = String(data.nick || '')
     const textRaw = String(data.text || '')
     const nick = nickRaw.slice(0, 20)
