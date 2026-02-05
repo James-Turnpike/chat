@@ -152,4 +152,13 @@ input.addEventListener('keydown', e => {
     e.preventDefault()
     send.click()
   }
+  if (e.key === 'Escape') {
+    input.value = ''
+    const t = ''
+    send.disabled = t.length === 0 || ws.readyState !== 1
+    if (counter) {
+      counter.textContent = '0/500'
+      counter.className = 'counter'
+    }
+  }
 })

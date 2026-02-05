@@ -22,6 +22,10 @@ Page({
       clearTimeout(this._reconnectTimer)
       this._reconnectTimer = null
     }
+    if (this._pingTimer) {
+      clearInterval(this._pingTimer)
+      this._pingTimer = null
+    }
     if (this.socket) {
       this.socket.close()
       this.socket = null

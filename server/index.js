@@ -31,8 +31,9 @@ wss.on('connection', ws => {
     if (data && data.type === 'ping') return
     const nickRaw = String(data.nick || '')
     const textRaw = String(data.text || '')
-    const nick = nickRaw.slice(0, 20)
-    const text = textRaw.replace(/\s+$/,'').slice(0, 500)
+    const nickTrim = nickRaw.trim()
+    const nick = (nickTrim ? nickTrim : '游客').slice(0, 20)
+    const text = textRaw.trim().slice(0, 500)
     if (!text) return
     const payload = {
       id: Date.now().toString(36) + Math.random().toString(16).slice(2),
