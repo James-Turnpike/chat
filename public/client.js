@@ -122,6 +122,13 @@ ws.addEventListener('message', e => {
   bubble.title = '双击复制'
   bubble.addEventListener('dblclick', () => {
     navigator.clipboard && navigator.clipboard.writeText(data.text)
+    const tip = document.createElement('div')
+    tip.className = 'copy-tip'
+    tip.textContent = '已复制'
+    bubble.appendChild(tip)
+    setTimeout(() => {
+      if (tip.parentNode) tip.parentNode.removeChild(tip)
+    }, 900)
   })
 
   const time = document.createElement('div')
@@ -139,6 +146,20 @@ ws.addEventListener('message', e => {
   wrap.appendChild(avatar)
   wrap.appendChild(content)
   list.appendChild(wrap)
+  // prune old messages to keep DOM light
+  ;(function prune(limit=200){
+    let msgCount = 0
+    for (let i = 0; i < list.children.length; i++) {
+      const el = list.children[i]
+      if (el.classList && el.classList.contains('msg')) msgCount++
+    }
+    while (msgCount > limit && list.firstChild) {
+      const first = list.firstChild
+      const wasMsg = first.classList && first.classList.contains('msg')
+      list.removeChild(first)
+      if (wasMsg) msgCount--
+    }
+  })()
   list.scrollTop = list.scrollHeight
 })
 send.addEventListener('click', () => {

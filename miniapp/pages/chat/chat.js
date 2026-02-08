@@ -208,6 +208,7 @@ Page({
     if (!text) return
     wx.setClipboardData({ data: text })
     wx.showToast({ title: '已复制', icon: 'none' })
+    if (wx.vibrateShort) wx.vibrateShort()
   },
   scrollToBottom() {
     const list = this.data.messages
