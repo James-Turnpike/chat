@@ -5,7 +5,7 @@
   </view>
   <scroll-view class="messages" scroll-y="true" scroll-with-animation="true" scroll-into-view="{{lastId}}">
     <view wx:if="{{!connected}}" class="status-bar">
-      <text>连接中...</text>
+      <text>连接中</text><text class="dots">...</text>
     </view>
     <view wx:if="{{messages.length === 0}}" class="empty-state">
       <text>暂无消息，快来聊聊吧~</text>
@@ -40,6 +40,7 @@
       value="{{inputValue}}"
       bindinput="onInput"
       bindconfirm="onSend"
+      bindfocus="onFocusInput"
     />
     <text class="counter {{counterLevel}}" wx:if="{{inputValue.length > 0}}">{{inputValue.length}}/500</text>
     <button class="send {{!inputValue || !connected ? 'disabled' : ''}}" bindtap="onSend" disabled="{{!inputValue || !connected}}">发送</button>

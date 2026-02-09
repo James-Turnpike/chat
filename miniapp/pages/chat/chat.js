@@ -15,6 +15,7 @@ Page({
     const nick = stored || '游客' + Math.floor(Math.random() * 1000)
     wx.setStorageSync('nick', nick)
     this.setData({ nick })
+    this._ids = {}
     this.connect()
   },
   onUnload() {
@@ -114,6 +115,7 @@ Page({
       }
       const self = msg.nick === this.data.nick
       const id = msg.id || Date.now().toString(36)
+      if (this._ids && this._ids[id]) return
       const avatarColor = this.getAvatarColor(msg.nick)
       const avatarChar = msg.nick[0] ? msg.nick[0].toUpperCase() : '?'
       const avatarTextColor = this.getAvatarTextColor(avatarColor)
@@ -133,6 +135,7 @@ Page({
         list.push({ id: sepId, type: 'sep', label: day })
       }
       list.push({ id, nick: msg.nick, text: msg.text, time: timeStr, self, avatarColor, avatarTextColor, avatarChar, ts: msg.ts })
+      if (this._ids) this._ids[id] = true
       if (list.length > 200) {
         list = list.slice(list.length - 200)
       }
@@ -216,7 +219,11 @@ Page({
     const last = list[list.length - 1]
     this.setData({ lastId: 'msg-' + last.id })
   },
+  onFocusInput() {
+    this.scrollToBottom()
+  },
   onClear() {
+    this._ids = {}
     this.setData({ messages: [], lastId: '', inputValue: '', focus: true })
   }
 })

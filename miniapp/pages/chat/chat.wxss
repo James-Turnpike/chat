@@ -21,6 +21,15 @@
   color: #7a7a7a;
   font-size: 24rpx;
 }
+.dots {
+  margin-left: 8rpx;
+  animation: blinkDots 1.2s ease-in-out infinite;
+}
+@keyframes blinkDots {
+  0% { opacity: 0 }
+  50% { opacity: 1 }
+  100% { opacity: 0 }
+}
 .title {
   font-size: 36rpx;
   color: #2b2b2b;
