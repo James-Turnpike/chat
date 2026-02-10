@@ -16,6 +16,7 @@ Page({
     wx.setStorageSync('nick', nick)
     this.setData({ nick })
     this._ids = {}
+    this.loadHistory()
     this.connect()
   },
   onUnload() {
@@ -143,6 +144,7 @@ Page({
         messages: list,
         lastId: 'msg-' + id
       })
+      this.saveHistory(this.data.messages)
     })
     socket.onClose(() => {
       this.setData({ connected: false })
@@ -206,6 +208,25 @@ Page({
     const pad = n => (n < 10 ? '0' + n : '' + n)
     return pad(d.getMonth() + 1) + '-' + pad(d.getDate())
   },
+  loadHistory() {
+    try {
+      const list = wx.getStorageSync('messages')
+      if (Array.isArray(list) && list.length) {
+        const last = list[list.length - 1]
+        this.setData({ messages: list, lastId: last && last.id ? ('msg-' + last.id) : '' })
+        if (!this._ids) this._ids = {}
+        for (let i = 0; i < list.length; i++) {
+          const it = list[i]
+          if (it && it.id) this._ids[it.id] = true
+        }
+      }
+    } catch (e) {}
+  },
+  saveHistory(list) {
+    try {
+      wx.setStorageSync('messages', list.slice(-200))
+    } catch (e) {}
+  },
   onCopy(e) {
     const text = e.currentTarget.dataset.text || ''
     if (!text) return
@@ -225,5 +246,6 @@ Page({
   onClear() {
     this._ids = {}
     this.setData({ messages: [], lastId: '', inputValue: '', focus: true })
+    try { wx.removeStorageSync('messages') } catch (e) {}
   }
 })
