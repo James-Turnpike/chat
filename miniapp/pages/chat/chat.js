@@ -28,6 +28,18 @@ Page({
       clearInterval(this._pingTimer)
       this._pingTimer = null
     }
+    if (this._saveTimer) {
+      clearTimeout(this._saveTimer)
+      this._saveTimer = null
+    }
+    if (this._pendingHistory && Array.isArray(this._pendingHistory)) {
+      this.saveHistory(this._pendingHistory)
+      this._pendingHistory = null
+    }
+    if (this._colorSaveTimer) {
+      clearTimeout(this._colorSaveTimer)
+      this._colorSaveTimer = null
+    }
     if (this.socket) {
       this.socket.close()
       this.socket = null
@@ -44,7 +56,7 @@ Page({
     const hue = Math.abs(hash) % 360
     const color = this.hslToHex(hue, 45, 78)
     this._colorCache[key] = color
-    this.saveColorCache()
+    this.scheduleSaveColorCache()
     return color
   },
   getAvatarTextColor(hex) {
@@ -69,6 +81,15 @@ Page({
     try {
       wx.setStorageSync('colorCache', this._colorCache)
     } catch (e) {}
+  },
+  scheduleSaveColorCache() {
+    if (this._colorSaveTimer) {
+      clearTimeout(this._colorSaveTimer)
+    }
+    this._colorSaveTimer = setTimeout(() => {
+      this._colorSaveTimer = null
+      this.saveColorCache()
+    }, 500)
   },
   hslToHex(h, s, l) {
     s /= 100
@@ -144,7 +165,7 @@ Page({
         messages: list,
         lastId: 'msg-' + id
       })
-      this.saveHistory(this.data.messages)
+      this.scheduleSaveHistory(list)
     })
     socket.onClose(() => {
       this.setData({ connected: false })
@@ -226,6 +247,19 @@ Page({
     try {
       wx.setStorageSync('messages', list.slice(-200))
     } catch (e) {}
+  },
+  scheduleSaveHistory(list) {
+    this._pendingHistory = list
+    if (this._saveTimer) {
+      clearTimeout(this._saveTimer)
+    }
+    this._saveTimer = setTimeout(() => {
+      this._saveTimer = null
+      if (this._pendingHistory) {
+        this.saveHistory(this._pendingHistory)
+        this._pendingHistory = null
+      }
+    }, 300)
   },
   onCopy(e) {
     const text = e.currentTarget.dataset.text || ''
