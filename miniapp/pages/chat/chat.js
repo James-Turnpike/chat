@@ -16,6 +16,8 @@ Page({
     wx.setStorageSync('nick', nick)
     this.setData({ nick })
     this._ids = {}
+    this._avatarMetaCache = {}
+    this._reconnectDelay = 2000
     this.loadHistory()
     this.connect()
   },
@@ -63,6 +65,18 @@ Page({
     const { r, g, b } = this.hexToRgb(hex)
     const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
     return luminance > 0.68 ? '#1a1a1a' : '#ffffff'
+  },
+  getAvatarMeta(nick) {
+    const key = ((nick || '').trim().toLowerCase()) || '游客'
+    if (!this._avatarMetaCache) this._avatarMetaCache = {}
+    const cached = this._avatarMetaCache[key]
+    if (cached) return cached
+    const color = this.getAvatarColor(nick)
+    const textColor = this.getAvatarTextColor(color)
+    const char = (nick && nick[0]) ? nick[0].toUpperCase() : '?'
+    const meta = { color, textColor, char }
+    this._avatarMetaCache[key] = meta
+    return meta
   },
   hexToRgb(hex) {
     const h = hex.replace('#', '')
@@ -121,6 +135,7 @@ Page({
     socket.onOpen(() => {
       this.setData({ connected: true, focus: true })
       wx.showToast({ title: '已连接', icon: 'none' })
+      this._reconnectDelay = 2000
       if (this._pingTimer) clearInterval(this._pingTimer)
       this._pingTimer = setInterval(() => {
         try {
@@ -138,9 +153,10 @@ Page({
       const self = msg.nick === this.data.nick
       const id = msg.id || Date.now().toString(36)
       if (this._ids && this._ids[id]) return
-      const avatarColor = this.getAvatarColor(msg.nick)
-      const avatarChar = msg.nick[0] ? msg.nick[0].toUpperCase() : '?'
-      const avatarTextColor = this.getAvatarTextColor(avatarColor)
+      const meta = this.getAvatarMeta(msg.nick)
+      const avatarColor = meta.color
+      const avatarTextColor = meta.textColor
+      const avatarChar = meta.char
       const timeStr = this.formatTime(msg.ts) || msg.time
       const day = this.dayKey(msg.ts)
       let list = this.data.messages.slice()
@@ -186,10 +202,14 @@ Page({
   },
   scheduleReconnect() {
     if (this._reconnectTimer) return
+    const base = this._reconnectDelay || 2000
+    const jitter = base * (0.8 + Math.random() * 0.4)
     this._reconnectTimer = setTimeout(() => {
       this._reconnectTimer = null
       this.connect()
-    }, 2000)
+      const next = Math.min(Math.round(base * 1.5), 30000)
+      this._reconnectDelay = next
+    }, Math.round(jitter))
   },
   onInput(e) {
     const v = e.detail.value || ''
