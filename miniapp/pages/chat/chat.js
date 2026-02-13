@@ -175,7 +175,18 @@ Page({
       list.push({ id, nick: msg.nick, text: msg.text, time: timeStr, self, avatarColor, avatarTextColor, avatarChar, ts: msg.ts })
       if (this._ids) this._ids[id] = true
       if (list.length > 200) {
-        list = list.slice(list.length - 200)
+        const trimmed = list.slice(list.length - 200)
+        list = trimmed
+        if (this._ids) {
+          const map = {}
+          for (let i = 0; i < trimmed.length; i++) {
+            const it = trimmed[i]
+            if (it && it.id && it.type !== 'sep') {
+              map[it.id] = true
+            }
+          }
+          this._ids = map
+        }
       }
       this.setData({
         messages: list,
@@ -301,5 +312,10 @@ Page({
     this._ids = {}
     this.setData({ messages: [], lastId: '', inputValue: '', focus: true })
     try { wx.removeStorageSync('messages') } catch (e) {}
+    if (this._saveTimer) {
+      clearTimeout(this._saveTimer)
+      this._saveTimer = null
+    }
+    this._pendingHistory = null
   }
 })
