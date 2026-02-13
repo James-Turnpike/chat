@@ -17,6 +17,8 @@ Page({
     this.setData({ nick })
     this._ids = {}
     this._avatarMetaCache = {}
+    this._avatarMetaOrder = []
+    this._colorOrder = []
     this._reconnectDelay = 2000
     this.loadHistory()
     this.connect()
@@ -58,6 +60,14 @@ Page({
     const hue = Math.abs(hash) % 360
     const color = this.hslToHex(hue, 45, 78)
     this._colorCache[key] = color
+    const idx = this._colorOrder.indexOf(key)
+    if (idx >= 0) this._colorOrder.splice(idx, 1)
+    this._colorOrder.push(key)
+    const MAX = 256
+    if (this._colorOrder.length > MAX) {
+      const oldKey = this._colorOrder.shift()
+      if (oldKey) delete this._colorCache[oldKey]
+    }
     this.scheduleSaveColorCache()
     return color
   },
@@ -76,6 +86,14 @@ Page({
     const char = (nick && nick[0]) ? nick[0].toUpperCase() : '?'
     const meta = { color, textColor, char }
     this._avatarMetaCache[key] = meta
+    const idx = this._avatarMetaOrder.indexOf(key)
+    if (idx >= 0) this._avatarMetaOrder.splice(idx, 1)
+    this._avatarMetaOrder.push(key)
+    const MAX = 256
+    if (this._avatarMetaOrder.length > MAX) {
+      const oldKey = this._avatarMetaOrder.shift()
+      if (oldKey) delete this._avatarMetaCache[oldKey]
+    }
     return meta
   },
   hexToRgb(hex) {
@@ -269,7 +287,7 @@ Page({
         if (!this._ids) this._ids = {}
         for (let i = 0; i < list.length; i++) {
           const it = list[i]
-          if (it && it.id) this._ids[it.id] = true
+          if (it && it.id && it.type !== 'sep') this._ids[it.id] = true
         }
       }
     } catch (e) {}
