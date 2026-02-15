@@ -258,8 +258,16 @@ Page({
   onSend() {
     const text = this.data.inputValue.trim()
     if (!text) return
+    if (text.length > 500) {
+      wx.showToast({ title: '内容过长', icon: 'none' })
+      return
+    }
     if (!this.socket || !this.data.connected) {
-      wx.showToast({ title: '正在连接...', icon: 'none' })
+      const now = Date.now()
+      if (!this._lastConnectToastAt || now - this._lastConnectToastAt > 5000) {
+        wx.showToast({ title: '正在连接...', icon: 'none' })
+        this._lastConnectToastAt = now
+      }
       return
     }
     const payload = JSON.stringify({ nick: this.data.nick, text })
@@ -337,7 +345,9 @@ Page({
     const list = this.data.messages
     if (!list || !list.length) return
     const last = list[list.length - 1]
-    this.setData({ lastId: 'msg-' + last.id })
+    const id = 'msg-' + last.id
+    if (this.data.lastId === id) return
+    this.setData({ lastId: id })
   },
   onFocusInput() {
     this.scrollToBottom()
