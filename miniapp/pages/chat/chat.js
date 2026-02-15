@@ -152,7 +152,11 @@ Page({
     this.setData({ connected: false })
     socket.onOpen(() => {
       this.setData({ connected: true, focus: true })
-      wx.showToast({ title: '已连接', icon: 'none' })
+      const now = Date.now()
+      if (!this._lastToastAt || now - this._lastToastAt > 5000) {
+        wx.showToast({ title: '已连接', icon: 'none' })
+        this._lastToastAt = now
+      }
       this._reconnectDelay = 2000
       if (this._pingTimer) clearInterval(this._pingTimer)
       this._pingTimer = setInterval(() => {
@@ -178,14 +182,7 @@ Page({
       const timeStr = this.formatTime(msg.ts) || msg.time
       const day = this.dayKey(msg.ts)
       let list = this.data.messages.slice()
-      let lastDay = ''
-      for (let i = list.length - 1; i >= 0; i--) {
-        const it = list[i]
-        if (it && it.type !== 'sep') {
-          lastDay = this.dayKey(it.ts)
-          break
-        }
-      }
+      const lastDay = this._lastMsgDay || ''
       if (day && day !== lastDay) {
         const sepId = 'sep-' + day
         list.push({ id: sepId, type: 'sep', label: day })
@@ -205,11 +202,21 @@ Page({
           }
           this._ids = map
         }
+        let d = ''
+        for (let i = trimmed.length - 1; i >= 0; i--) {
+          const it = trimmed[i]
+          if (it && it.type !== 'sep') {
+            d = this.dayKey(it.ts)
+            break
+          }
+        }
+        this._lastMsgDay = d
       }
       this.setData({
         messages: list,
         lastId: 'msg-' + id
       })
+      this._lastMsgDay = day
       this.scheduleSaveHistory(list)
     })
     socket.onClose(() => {
@@ -257,7 +264,7 @@ Page({
     }
     const payload = JSON.stringify({ nick: this.data.nick, text })
     this.socket.send({ data: payload })
-    this.setData({ inputValue: '', focus: true })
+    this.setData({ inputValue: '', focus: true, counterLevel: '' })
     if (wx.vibrateShort) wx.vibrateShort()
   },
   formatTime(ts) {
@@ -289,6 +296,15 @@ Page({
           const it = list[i]
           if (it && it.id && it.type !== 'sep') this._ids[it.id] = true
         }
+        let d = ''
+        for (let i = list.length - 1; i >= 0; i--) {
+          const it = list[i]
+          if (it && it.type !== 'sep') {
+            d = this.dayKey(it.ts)
+            break
+          }
+        }
+        this._lastMsgDay = d
       }
     } catch (e) {}
   },
@@ -335,5 +351,6 @@ Page({
       this._saveTimer = null
     }
     this._pendingHistory = null
+    this._lastMsgDay = ''
   }
 })
