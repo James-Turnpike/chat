@@ -1,4 +1,5 @@
 const config = require('../../utils/config')
+const MAX_MSG = 200
 Page({
   data: {
     messages: [],
@@ -22,6 +23,24 @@ Page({
     this._reconnectDelay = 2000
     this.loadHistory()
     this.connect()
+    wx.onNetworkStatusChange && wx.onNetworkStatusChange(res => {
+      const online = !!(res && res.isConnected)
+      this._netOnline = online
+      if (!online) {
+        this.setData({ connected: false })
+        if (this._pingTimer) {
+          clearInterval(this._pingTimer)
+          this._pingTimer = null
+        }
+        if (this._reconnectTimer) {
+          clearTimeout(this._reconnectTimer)
+          this._reconnectTimer = null
+        }
+      } else {
+        this._reconnectDelay = 2000
+        if (!this.data.connected) this.scheduleReconnect()
+      }
+    })
   },
   onUnload() {
     if (this._reconnectTimer) {
@@ -189,8 +208,8 @@ Page({
       }
       list.push({ id, nick: msg.nick, text: msg.text, time: timeStr, self, avatarColor, avatarTextColor, avatarChar, ts: msg.ts })
       if (this._ids) this._ids[id] = true
-      if (list.length > 200) {
-        const trimmed = list.slice(list.length - 200)
+      if (list.length > MAX_MSG) {
+        const trimmed = list.slice(list.length - MAX_MSG)
         list = trimmed
         if (this._ids) {
           const map = {}
@@ -271,7 +290,17 @@ Page({
       return
     }
     const payload = JSON.stringify({ nick: this.data.nick, text })
-    this.socket.send({ data: payload })
+    try {
+      this.socket.send({ data: payload })
+    } catch (e) {
+      const now = Date.now()
+      if (!this._lastConnectToastAt || now - this._lastConnectToastAt > 5000) {
+        wx.showToast({ title: '正在连接...', icon: 'none' })
+        this._lastConnectToastAt = now
+      }
+      this.scheduleReconnect()
+      return
+    }
     this.setData({ inputValue: '', focus: true, counterLevel: '' })
     if (wx.vibrateShort) wx.vibrateShort()
   },
@@ -318,7 +347,7 @@ Page({
   },
   saveHistory(list) {
     try {
-      wx.setStorageSync('messages', list.slice(-200))
+      wx.setStorageSync('messages', list.slice(-MAX_MSG))
     } catch (e) {}
   },
   scheduleSaveHistory(list) {
