@@ -1,5 +1,16 @@
 const config = require('../../utils/config')
 const MAX_MSG = 200
+const LENGTH_LIMIT = 500
+const WARN_THRESHOLD = 400
+const DANGER_THRESHOLD = 490
+const PING_INTERVAL = 30000
+const TOAST_THROTTLE = 5000
+const HISTORY_DEBOUNCE = 300
+const COLOR_SAVE_DEBOUNCE = 500
+const COLOR_CACHE_MAX = 256
+const META_CACHE_MAX = 256
+const RECONNECT_BASE = 2000
+const RECONNECT_MAX = 30000
 Page({
   data: {
     messages: [],
@@ -20,7 +31,7 @@ Page({
     this._avatarMetaCache = {}
     this._avatarMetaOrder = []
     this._colorOrder = []
-    this._reconnectDelay = 2000
+    this._reconnectDelay = RECONNECT_BASE
     this.loadHistory()
     this.connect()
     wx.onNetworkStatusChange && wx.onNetworkStatusChange(res => {
@@ -37,7 +48,7 @@ Page({
           this._reconnectTimer = null
         }
       } else {
-        this._reconnectDelay = 2000
+        this._reconnectDelay = RECONNECT_BASE
         if (!this.data.connected) this.scheduleReconnect()
       }
     })
@@ -82,8 +93,7 @@ Page({
     const idx = this._colorOrder.indexOf(key)
     if (idx >= 0) this._colorOrder.splice(idx, 1)
     this._colorOrder.push(key)
-    const MAX = 256
-    if (this._colorOrder.length > MAX) {
+    if (this._colorOrder.length > COLOR_CACHE_MAX) {
       const oldKey = this._colorOrder.shift()
       if (oldKey) delete this._colorCache[oldKey]
     }
@@ -108,8 +118,7 @@ Page({
     const idx = this._avatarMetaOrder.indexOf(key)
     if (idx >= 0) this._avatarMetaOrder.splice(idx, 1)
     this._avatarMetaOrder.push(key)
-    const MAX = 256
-    if (this._avatarMetaOrder.length > MAX) {
+    if (this._avatarMetaOrder.length > META_CACHE_MAX) {
       const oldKey = this._avatarMetaOrder.shift()
       if (oldKey) delete this._avatarMetaCache[oldKey]
     }
@@ -140,7 +149,7 @@ Page({
     this._colorSaveTimer = setTimeout(() => {
       this._colorSaveTimer = null
       this.saveColorCache()
-    }, 500)
+    }, COLOR_SAVE_DEBOUNCE)
   },
   hslToHex(h, s, l) {
     s /= 100
@@ -172,17 +181,17 @@ Page({
     socket.onOpen(() => {
       this.setData({ connected: true, focus: true })
       const now = Date.now()
-      if (!this._lastToastAt || now - this._lastToastAt > 5000) {
+      if (!this._lastToastAt || now - this._lastToastAt > TOAST_THROTTLE) {
         wx.showToast({ title: '已连接', icon: 'none' })
         this._lastToastAt = now
       }
-      this._reconnectDelay = 2000
+      this._reconnectDelay = RECONNECT_BASE
       if (this._pingTimer) clearInterval(this._pingTimer)
       this._pingTimer = setInterval(() => {
         try {
           this.socket && this.socket.send({ data: '{"type":"ping"}' })
         } catch (e) {}
-      }, 30000)
+      }, PING_INTERVAL)
     })
     socket.onMessage(res => {
       let msg
@@ -262,7 +271,7 @@ Page({
     this._reconnectTimer = setTimeout(() => {
       this._reconnectTimer = null
       this.connect()
-      const next = Math.min(Math.round(base * 1.5), 30000)
+      const next = Math.min(Math.round(base * 1.5), RECONNECT_MAX)
       this._reconnectDelay = next
     }, Math.round(jitter))
   },
@@ -270,20 +279,20 @@ Page({
     const v = e.detail.value || ''
     let level = ''
     const len = v.length
-    if (len > 490) level = 'danger'
-    else if (len > 400) level = 'warn'
+    if (len > DANGER_THRESHOLD) level = 'danger'
+    else if (len > WARN_THRESHOLD) level = 'warn'
     this.setData({ inputValue: v, counterLevel: level })
   },
   onSend() {
     const text = this.data.inputValue.trim()
     if (!text) return
-    if (text.length > 500) {
+    if (text.length > LENGTH_LIMIT) {
       wx.showToast({ title: '内容过长', icon: 'none' })
       return
     }
     if (!this.socket || !this.data.connected) {
       const now = Date.now()
-      if (!this._lastConnectToastAt || now - this._lastConnectToastAt > 5000) {
+      if (!this._lastConnectToastAt || now - this._lastConnectToastAt > TOAST_THROTTLE) {
         wx.showToast({ title: '正在连接...', icon: 'none' })
         this._lastConnectToastAt = now
       }
@@ -294,7 +303,7 @@ Page({
       this.socket.send({ data: payload })
     } catch (e) {
       const now = Date.now()
-      if (!this._lastConnectToastAt || now - this._lastConnectToastAt > 5000) {
+      if (!this._lastConnectToastAt || now - this._lastConnectToastAt > TOAST_THROTTLE) {
         wx.showToast({ title: '正在连接...', icon: 'none' })
         this._lastConnectToastAt = now
       }
@@ -361,7 +370,7 @@ Page({
         this.saveHistory(this._pendingHistory)
         this._pendingHistory = null
       }
-    }, 300)
+    }, HISTORY_DEBOUNCE)
   },
   onCopy(e) {
     const text = e.currentTarget.dataset.text || ''
