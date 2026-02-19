@@ -209,17 +209,24 @@ Page({
       const avatarChar = meta.char
       const timeStr = this.formatTime(msg.ts) || msg.time
       const day = this.dayKey(msg.ts)
-      let list = this.data.messages.slice()
       const lastDay = this._lastMsgDay || ''
+      const entries = []
       if (day && day !== lastDay) {
-        const sepId = 'sep-' + day
-        list.push({ id: sepId, type: 'sep', label: day })
+        entries.push({ id: 'sep-' + day, type: 'sep', label: day })
       }
-      list.push({ id, nick: msg.nick, text: msg.text, time: timeStr, self, avatarColor, avatarTextColor, avatarChar, ts: msg.ts })
+      entries.push({ id, nick: msg.nick, text: msg.text, time: timeStr, self, avatarColor, avatarTextColor, avatarChar, ts: msg.ts })
       if (this._ids) this._ids[id] = true
-      if (list.length > MAX_MSG) {
-        const trimmed = list.slice(list.length - MAX_MSG)
-        list = trimmed
+      const current = this.data.messages || []
+      const total = current.length + entries.length
+      const lastId = 'msg-' + id
+      if (total <= MAX_MSG) {
+        this.appendMessages(entries, lastId)
+        const listForSave = current.concat(entries)
+        this._lastMsgDay = day
+        this.scheduleSaveHistory(listForSave)
+      } else {
+        const combined = current.concat(entries)
+        const trimmed = combined.slice(combined.length - MAX_MSG)
         if (this._ids) {
           const map = {}
           for (let i = 0; i < trimmed.length; i++) {
@@ -239,13 +246,9 @@ Page({
           }
         }
         this._lastMsgDay = d
+        this.setData({ messages: trimmed, lastId })
+        this.scheduleSaveHistory(trimmed)
       }
-      this.setData({
-        messages: list,
-        lastId: 'msg-' + id
-      })
-      this._lastMsgDay = day
-      this.scheduleSaveHistory(list)
     })
     socket.onClose(() => {
       this.setData({ connected: false })
@@ -371,6 +374,15 @@ Page({
         this._pendingHistory = null
       }
     }, HISTORY_DEBOUNCE)
+  },
+  appendMessages(entries, lastId) {
+    const base = (this.data.messages && this.data.messages.length) || 0
+    const patch = {}
+    for (let i = 0; i < entries.length; i++) {
+      patch['messages[' + (base + i) + ']'] = entries[i]
+    }
+    patch.lastId = lastId
+    this.setData(patch)
   },
   onCopy(e) {
     const text = e.currentTarget.dataset.text || ''
