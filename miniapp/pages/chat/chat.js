@@ -79,6 +79,25 @@ Page({
       this.socket = null
     }
   },
+  onHide() {
+    if (this._pingTimer) {
+      clearInterval(this._pingTimer)
+      this._pingTimer = null
+    }
+  },
+  onShow() {
+    if (this.data && this.data.connected) {
+      if (!this._pingTimer) {
+        this._pingTimer = setInterval(() => {
+          try {
+            this.socket && this.socket.send({ data: '{"type":"ping"}' })
+          } catch (e) {}
+        }, PING_INTERVAL)
+      }
+    } else {
+      this.scheduleReconnect()
+    }
+  },
   getAvatarColor(nick) {
     const key = ((nick || '').trim().toLowerCase()) || '游客'
     if (!this._colorCache) this._colorCache = {}
@@ -200,6 +219,7 @@ Page({
       } catch (e) {
         return
       }
+      if (!msg || typeof msg.text !== 'string' || !msg.nick) return
       const self = msg.nick === this.data.nick
       const id = msg.id || Date.now().toString(36)
       if (this._ids && this._ids[id]) return
@@ -284,6 +304,7 @@ Page({
     const len = v.length
     if (len > DANGER_THRESHOLD) level = 'danger'
     else if (len > WARN_THRESHOLD) level = 'warn'
+    if (v === this.data.inputValue && level === this.data.counterLevel) return
     this.setData({ inputValue: v, counterLevel: level })
   },
   onSend() {
