@@ -11,6 +11,7 @@ const COLOR_CACHE_MAX = 256
 const META_CACHE_MAX = 256
 const RECONNECT_BASE = 2000
 const RECONNECT_MAX = 30000
+const BATCH_WINDOW = 30
 Page({
   data: {
     messages: [],
@@ -31,6 +32,8 @@ Page({
     this._avatarMetaCache = {}
     this._avatarMetaOrder = []
     this._colorOrder = []
+    this._batchQueue = []
+    this._batchTimer = null
     this._reconnectDelay = RECONNECT_BASE
     this.loadHistory()
     this.connect()
@@ -73,6 +76,10 @@ Page({
     if (this._colorSaveTimer) {
       clearTimeout(this._colorSaveTimer)
       this._colorSaveTimer = null
+    }
+    if (this._batchTimer) {
+      clearTimeout(this._batchTimer)
+      this._batchTimer = null
     }
     if (this.socket) {
       this.socket.close()
@@ -236,39 +243,9 @@ Page({
       }
       entries.push({ id, nick: msg.nick, text: msg.text, time: timeStr, self, avatarColor, avatarTextColor, avatarChar, ts: msg.ts })
       if (this._ids) this._ids[id] = true
-      const current = this.data.messages || []
-      const total = current.length + entries.length
-      const lastId = 'msg-' + id
-      if (total <= MAX_MSG) {
-        this.appendMessages(entries, lastId)
-        const listForSave = current.concat(entries)
-        this._lastMsgDay = day
-        this.scheduleSaveHistory(listForSave)
-      } else {
-        const combined = current.concat(entries)
-        const trimmed = combined.slice(combined.length - MAX_MSG)
-        if (this._ids) {
-          const map = {}
-          for (let i = 0; i < trimmed.length; i++) {
-            const it = trimmed[i]
-            if (it && it.id && it.type !== 'sep') {
-              map[it.id] = true
-            }
-          }
-          this._ids = map
-        }
-        let d = ''
-        for (let i = trimmed.length - 1; i >= 0; i--) {
-          const it = trimmed[i]
-          if (it && it.type !== 'sep') {
-            d = this.dayKey(it.ts)
-            break
-          }
-        }
-        this._lastMsgDay = d
-        this.setData({ messages: trimmed, lastId })
-        this.scheduleSaveHistory(trimmed)
-      }
+      if (!this._batchQueue) this._batchQueue = []
+      this._batchQueue.push.apply(this._batchQueue, entries)
+      this.scheduleFlush('msg-' + id, day)
     })
     socket.onClose(() => {
       this.setData({ connected: false })
@@ -402,8 +379,81 @@ Page({
     for (let i = 0; i < entries.length; i++) {
       patch['messages[' + (base + i) + ']'] = entries[i]
     }
-    patch.lastId = lastId
+    if (lastId && this.data.lastId !== lastId) {
+      patch.lastId = lastId
+    }
     this.setData(patch)
+  },
+  scheduleFlush(lastId, day) {
+    if (this._batchTimer) return
+    this._nextLastId = lastId
+    this._nextDay = day
+    this._batchTimer = setTimeout(() => {
+      this._batchTimer = null
+      this.flushMessages()
+    }, BATCH_WINDOW)
+  },
+  flushMessages() {
+    const queue = this._batchQueue || []
+    if (!queue.length) return
+    this._batchQueue = []
+    const current = this.data.messages || []
+    let combined = current.concat(queue)
+    combined = this.dedupSeps(combined)
+    if (combined.length <= MAX_MSG) {
+      const base = current.length
+      const patch = {}
+      for (let i = 0; i < combined.length - base; i++) {
+        patch['messages[' + (base + i) + ']'] = combined[base + i]
+      }
+      const lastId = this._nextLastId
+      if (lastId && this.data.lastId !== lastId) patch.lastId = lastId
+      this.setData(patch)
+      this._lastMsgDay = this._nextDay || this._lastMsgDay
+      this.scheduleSaveHistory(combined)
+    } else {
+      const trimmed = combined.slice(combined.length - MAX_MSG)
+      if (this._ids) {
+        const map = {}
+        for (let i = 0; i < trimmed.length; i++) {
+          const it = trimmed[i]
+          if (it && it.id && it.type !== 'sep') map[it.id] = true
+        }
+        this._ids = map
+      }
+      let d = ''
+      for (let i = trimmed.length - 1; i >= 0; i--) {
+        const it = trimmed[i]
+        if (it && it.type !== 'sep') {
+          d = this.dayKey(it.ts)
+          break
+        }
+      }
+      this._lastMsgDay = d
+      const lastId = this._nextLastId
+      const dataObj = lastId && this.data.lastId !== lastId ? { messages: trimmed, lastId } : { messages: trimmed }
+      this.setData(dataObj)
+      this.scheduleSaveHistory(trimmed)
+    }
+    this._nextLastId = ''
+    this._nextDay = ''
+  },
+  dedupSeps(list) {
+    const out = []
+    for (let i = 0; i < list.length; i++) {
+      const it = list[i]
+      if (!it || it.type !== 'sep') {
+        out.push(it)
+        continue
+      }
+      const prev = out[out.length - 1]
+      if (!prev || prev.type !== 'sep' || prev.label !== it.label) {
+        out.push(it)
+      }
+    }
+    while (out.length && out[0] && out[0].type === 'sep') out.shift()
+    while (out.length && out[out.length - 1] && out[out.length - 1].type === 'sep') out.pop()
+    return out
   },
   onCopy(e) {
     const text = e.currentTarget.dataset.text || ''
