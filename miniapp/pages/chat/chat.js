@@ -20,7 +20,8 @@ Page({
     lastId: '',
     connected: false,
     focus: false,
-    counterLevel: ''
+    counterLevel: '',
+    nearBottom: true
   },
   onLoad() {
     this.loadColorCache()
@@ -104,6 +105,20 @@ Page({
     } else {
       this.scheduleReconnect()
     }
+  },
+  onScroll(e) {
+    const dy = e && e.detail && typeof e.detail.deltaY === 'number' ? e.detail.deltaY : 0
+    if (dy < 0 && this.data.nearBottom) {
+      this.setData({ nearBottom: false })
+    }
+  },
+  onScrollToLower() {
+    if (!this.data.nearBottom) {
+      this.setData({ nearBottom: true })
+    }
+  },
+  shouldAutoScroll() {
+    return !!this.data.nearBottom
   },
   getAvatarColor(nick) {
     const key = ((nick || '').trim().toLowerCase()) || '游客'
@@ -379,7 +394,7 @@ Page({
     for (let i = 0; i < entries.length; i++) {
       patch['messages[' + (base + i) + ']'] = entries[i]
     }
-    if (lastId && this.data.lastId !== lastId) {
+    if (lastId && this.shouldAutoScroll() && this.data.lastId !== lastId) {
       patch.lastId = lastId
     }
     this.setData(patch)
@@ -407,7 +422,7 @@ Page({
         patch['messages[' + (base + i) + ']'] = combined[base + i]
       }
       const lastId = this._nextLastId
-      if (lastId && this.data.lastId !== lastId) patch.lastId = lastId
+      if (lastId && this.shouldAutoScroll() && this.data.lastId !== lastId) patch.lastId = lastId
       this.setData(patch)
       this._lastMsgDay = this._nextDay || this._lastMsgDay
       this.scheduleSaveHistory(combined)
@@ -431,7 +446,7 @@ Page({
       }
       this._lastMsgDay = d
       const lastId = this._nextLastId
-      const dataObj = lastId && this.data.lastId !== lastId ? { messages: trimmed, lastId } : { messages: trimmed }
+      const dataObj = this.shouldAutoScroll() && lastId && this.data.lastId !== lastId ? { messages: trimmed, lastId } : { messages: trimmed }
       this.setData(dataObj)
       this.scheduleSaveHistory(trimmed)
     }
