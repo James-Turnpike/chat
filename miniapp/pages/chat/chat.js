@@ -21,7 +21,8 @@ Page({
     connected: false,
     focus: false,
     counterLevel: '',
-    nearBottom: true
+    nearBottom: true,
+    showToBottom: false
   },
   onLoad() {
     this.loadColorCache()
@@ -114,7 +115,7 @@ Page({
   },
   onScrollToLower() {
     if (!this.data.nearBottom) {
-      this.setData({ nearBottom: true })
+      this.setData({ nearBottom: true, showToBottom: false })
     }
   },
   shouldAutoScroll() {
@@ -397,6 +398,7 @@ Page({
     if (lastId && this.shouldAutoScroll() && this.data.lastId !== lastId) {
       patch.lastId = lastId
     }
+    if (!this.shouldAutoScroll()) patch.showToBottom = true
     this.setData(patch)
   },
   scheduleFlush(lastId, day) {
@@ -423,6 +425,7 @@ Page({
       }
       const lastId = this._nextLastId
       if (lastId && this.shouldAutoScroll() && this.data.lastId !== lastId) patch.lastId = lastId
+      if (!this.shouldAutoScroll()) patch.showToBottom = true
       this.setData(patch)
       this._lastMsgDay = this._nextDay || this._lastMsgDay
       this.scheduleSaveHistory(combined)
@@ -447,6 +450,7 @@ Page({
       this._lastMsgDay = d
       const lastId = this._nextLastId
       const dataObj = this.shouldAutoScroll() && lastId && this.data.lastId !== lastId ? { messages: trimmed, lastId } : { messages: trimmed }
+      if (!this.shouldAutoScroll()) dataObj.showToBottom = true
       this.setData(dataObj)
       this.scheduleSaveHistory(trimmed)
     }
@@ -482,8 +486,11 @@ Page({
     if (!list || !list.length) return
     const last = list[list.length - 1]
     const id = 'msg-' + last.id
-    if (this.data.lastId === id) return
-    this.setData({ lastId: id })
+    if (this.data.lastId === id) {
+      this.setData({ nearBottom: true, showToBottom: false })
+      return
+    }
+    this.setData({ lastId: id, nearBottom: true, showToBottom: false })
   },
   onFocusInput() {
     this.scrollToBottom()

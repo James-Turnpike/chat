@@ -201,3 +201,20 @@
     transform: translate3d(0, 0, 0);
   }
 }
+.to-bottom {
+  position: fixed;
+  right: 24rpx;
+  bottom: calc(120rpx + env(safe-area-inset-bottom));
+  bottom: calc(120rpx + constant(safe-area-inset-bottom));
+  height: 64rpx;
+  padding: 0 20rpx;
+  background: #ffffff;
+  color: #2b2b2b;
+  border-radius: 32rpx;
+  box-shadow: 0 6rpx 18rpx rgba(0,0,0,0.08);
+  font-size: 26rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}

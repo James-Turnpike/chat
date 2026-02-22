@@ -28,6 +28,7 @@
       </block>
     </block>
   </scroll-view>
+  <view wx:if="{{!nearBottom && showToBottom}}" class="to-bottom" bindtap="scrollToBottom">回到底部</view>
   <view class="input-bar">
     <input
       class="input"
