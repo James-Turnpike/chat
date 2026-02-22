@@ -22,7 +22,8 @@ Page({
     focus: false,
     counterLevel: '',
     nearBottom: true,
-    showToBottom: false
+    showToBottom: false,
+    unreadCount: 0
   },
   onLoad() {
     this.loadColorCache()
@@ -115,7 +116,7 @@ Page({
   },
   onScrollToLower() {
     if (!this.data.nearBottom) {
-      this.setData({ nearBottom: true, showToBottom: false })
+      this.setData({ nearBottom: true, showToBottom: false, unreadCount: 0 })
     }
   },
   shouldAutoScroll() {
@@ -392,13 +393,18 @@ Page({
   appendMessages(entries, lastId) {
     const base = (this.data.messages && this.data.messages.length) || 0
     const patch = {}
+    let addedCount = 0
     for (let i = 0; i < entries.length; i++) {
       patch['messages[' + (base + i) + ']'] = entries[i]
+      if (entries[i] && entries[i].type !== 'sep') addedCount++
     }
     if (lastId && this.shouldAutoScroll() && this.data.lastId !== lastId) {
       patch.lastId = lastId
     }
-    if (!this.shouldAutoScroll()) patch.showToBottom = true
+    if (!this.shouldAutoScroll()) {
+      patch.showToBottom = true
+      patch.unreadCount = (this.data.unreadCount || 0) + addedCount
+    }
     this.setData(patch)
   },
   scheduleFlush(lastId, day) {
@@ -413,6 +419,11 @@ Page({
   flushMessages() {
     const queue = this._batchQueue || []
     if (!queue.length) return
+    let addedCount = 0
+    for (let i = 0; i < queue.length; i++) {
+      const it = queue[i]
+      if (it && it.type !== 'sep') addedCount++
+    }
     this._batchQueue = []
     const current = this.data.messages || []
     let combined = current.concat(queue)
@@ -425,7 +436,10 @@ Page({
       }
       const lastId = this._nextLastId
       if (lastId && this.shouldAutoScroll() && this.data.lastId !== lastId) patch.lastId = lastId
-      if (!this.shouldAutoScroll()) patch.showToBottom = true
+      if (!this.shouldAutoScroll()) {
+        patch.showToBottom = true
+        patch.unreadCount = (this.data.unreadCount || 0) + addedCount
+      }
       this.setData(patch)
       this._lastMsgDay = this._nextDay || this._lastMsgDay
       this.scheduleSaveHistory(combined)
@@ -450,7 +464,10 @@ Page({
       this._lastMsgDay = d
       const lastId = this._nextLastId
       const dataObj = this.shouldAutoScroll() && lastId && this.data.lastId !== lastId ? { messages: trimmed, lastId } : { messages: trimmed }
-      if (!this.shouldAutoScroll()) dataObj.showToBottom = true
+      if (!this.shouldAutoScroll()) {
+        dataObj.showToBottom = true
+        dataObj.unreadCount = (this.data.unreadCount || 0) + addedCount
+      }
       this.setData(dataObj)
       this.scheduleSaveHistory(trimmed)
     }
@@ -487,17 +504,17 @@ Page({
     const last = list[list.length - 1]
     const id = 'msg-' + last.id
     if (this.data.lastId === id) {
-      this.setData({ nearBottom: true, showToBottom: false })
+      this.setData({ nearBottom: true, showToBottom: false, unreadCount: 0 })
       return
     }
-    this.setData({ lastId: id, nearBottom: true, showToBottom: false })
+    this.setData({ lastId: id, nearBottom: true, showToBottom: false, unreadCount: 0 })
   },
   onFocusInput() {
     this.scrollToBottom()
   },
   onClear() {
     this._ids = {}
-    this.setData({ messages: [], lastId: '', inputValue: '', focus: true })
+    this.setData({ messages: [], lastId: '', inputValue: '', focus: true, showToBottom: false, unreadCount: 0, nearBottom: true })
     try { wx.removeStorageSync('messages') } catch (e) {}
     if (this._saveTimer) {
       clearTimeout(this._saveTimer)

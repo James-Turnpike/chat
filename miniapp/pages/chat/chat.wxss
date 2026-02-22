@@ -218,3 +218,16 @@
   justify-content: center;
   z-index: 10;
 }
+.badge {
+  margin-left: 10rpx;
+  min-width: 36rpx;
+  height: 36rpx;
+  padding: 0 10rpx;
+  border-radius: 18rpx;
+  background: #6ad3c8;
+  color: #ffffff;
+  font-size: 22rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
