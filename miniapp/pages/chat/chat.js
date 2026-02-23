@@ -452,7 +452,8 @@ Page({
       this._lastMsgDay = this._nextDay || this._lastMsgDay
       this.scheduleSaveHistory(combined)
     } else {
-      const trimmed = combined.slice(combined.length - MAX_MSG)
+      let trimmed = combined.slice(combined.length - MAX_MSG)
+      trimmed = this.dedupSeps(trimmed)
       if (this._ids) {
         const map = {}
         for (let i = 0; i < trimmed.length; i++) {
@@ -509,8 +510,15 @@ Page({
   scrollToBottom() {
     const list = this.data.messages
     if (!list || !list.length) return
-    const last = list[list.length - 1]
-    const id = 'msg-' + last.id
+    let id = ''
+    for (let i = list.length - 1; i >= 0; i--) {
+      const it = list[i]
+      if (it && it.id && it.type !== 'sep') {
+        id = 'msg-' + it.id
+        break
+      }
+    }
+    if (!id) return
     if (this.data.lastId === id) {
       this.setData({ nearBottom: true, showToBottom: false, unreadCount: 0 })
       return
