@@ -109,10 +109,10 @@ Page({
     }
   },
   onScroll(e) {
-    const dy = e && e.detail && typeof e.detail.deltaY === 'number' ? e.detail.deltaY : 0
-    if (dy < 0 && this.data.nearBottom) {
-      this.setData({ nearBottom: false })
-    }
+    const st = e && e.detail && typeof e.detail.scrollTop === 'number' ? e.detail.scrollTop : 0
+    const last = typeof this._lastScrollTop === 'number' ? this._lastScrollTop : 0
+    this._lastScrollTop = st
+    if (last - st > 20 && this.data.nearBottom) this.setData({ nearBottom: false })
   },
   onScrollToLower() {
     if (!this.data.nearBottom) {
@@ -353,8 +353,15 @@ Page({
     try {
       const list = wx.getStorageSync('messages')
       if (Array.isArray(list) && list.length) {
-        const last = list[list.length - 1]
-        this.setData({ messages: list, lastId: last && last.id ? ('msg-' + last.id) : '' })
+        let lastId = ''
+        for (let i = list.length - 1; i >= 0; i--) {
+          const it = list[i]
+          if (it && it.id && it.type !== 'sep') {
+            lastId = 'msg-' + it.id
+            break
+          }
+        }
+        this.setData({ messages: list, lastId })
         if (!this._ids) this._ids = {}
         for (let i = 0; i < list.length; i++) {
           const it = list[i]
@@ -408,13 +415,14 @@ Page({
     this.setData(patch)
   },
   scheduleFlush(lastId, day) {
-    if (this._batchTimer) return
     this._nextLastId = lastId
     this._nextDay = day
-    this._batchTimer = setTimeout(() => {
-      this._batchTimer = null
-      this.flushMessages()
-    }, BATCH_WINDOW)
+    if (!this._batchTimer) {
+      this._batchTimer = setTimeout(() => {
+        this._batchTimer = null
+        this.flushMessages()
+      }, BATCH_WINDOW)
+    }
   },
   flushMessages() {
     const queue = this._batchQueue || []
