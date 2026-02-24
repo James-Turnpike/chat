@@ -12,6 +12,8 @@ const META_CACHE_MAX = 256
 const RECONNECT_BASE = 2000
 const RECONNECT_MAX = 30000
 const BATCH_WINDOW = 30
+const SCROLL_THROTTLE = 100
+const LARGE_BATCH = 40
 Page({
   data: {
     messages: [],
@@ -23,7 +25,8 @@ Page({
     counterLevel: '',
     nearBottom: true,
     showToBottom: false,
-    unreadCount: 0
+    unreadCount: 0,
+    scrollAnim: false
   },
   onLoad() {
     this.loadColorCache()
@@ -111,6 +114,12 @@ Page({
   onScroll(e) {
     const st = e && e.detail && typeof e.detail.scrollTop === 'number' ? e.detail.scrollTop : 0
     const last = typeof this._lastScrollTop === 'number' ? this._lastScrollTop : 0
+    const now = Date.now()
+    if (this._lastScrollAt && now - this._lastScrollAt < SCROLL_THROTTLE) {
+      this._lastScrollTop = st
+      return
+    }
+    this._lastScrollAt = now
     this._lastScrollTop = st
     if (last - st > 20 && this.data.nearBottom) this.setData({ nearBottom: false })
   },
@@ -407,6 +416,7 @@ Page({
     }
     if (lastId && this.shouldAutoScroll() && this.data.lastId !== lastId) {
       patch.lastId = lastId
+      patch.scrollAnim = false
     }
     if (!this.shouldAutoScroll()) {
       patch.showToBottom = true
@@ -438,19 +448,35 @@ Page({
     combined = this.dedupSeps(combined)
     if (combined.length <= MAX_MSG) {
       const base = current.length
-      const patch = {}
-      for (let i = 0; i < combined.length - base; i++) {
-        patch['messages[' + (base + i) + ']'] = combined[base + i]
+      const newCount = combined.length - base
+      if (newCount > LARGE_BATCH) {
+        const lastId = this._nextLastId
+        const dataObj = this.shouldAutoScroll() && lastId && this.data.lastId !== lastId ? { messages: combined, lastId, scrollAnim: false } : { messages: combined }
+        if (!this.shouldAutoScroll()) {
+          dataObj.showToBottom = true
+          dataObj.unreadCount = (this.data.unreadCount || 0) + addedCount
+        }
+        this.setData(dataObj)
+        this._lastMsgDay = this._nextDay || this._lastMsgDay
+        this.scheduleSaveHistory(combined)
+      } else {
+        const patch = {}
+        for (let i = 0; i < newCount; i++) {
+          patch['messages[' + (base + i) + ']'] = combined[base + i]
+        }
+        const lastId = this._nextLastId
+        if (lastId && this.shouldAutoScroll() && this.data.lastId !== lastId) {
+          patch.lastId = lastId
+          patch.scrollAnim = false
+        }
+        if (!this.shouldAutoScroll()) {
+          patch.showToBottom = true
+          patch.unreadCount = (this.data.unreadCount || 0) + addedCount
+        }
+        this.setData(patch)
+        this._lastMsgDay = this._nextDay || this._lastMsgDay
+        this.scheduleSaveHistory(combined)
       }
-      const lastId = this._nextLastId
-      if (lastId && this.shouldAutoScroll() && this.data.lastId !== lastId) patch.lastId = lastId
-      if (!this.shouldAutoScroll()) {
-        patch.showToBottom = true
-        patch.unreadCount = (this.data.unreadCount || 0) + addedCount
-      }
-      this.setData(patch)
-      this._lastMsgDay = this._nextDay || this._lastMsgDay
-      this.scheduleSaveHistory(combined)
     } else {
       let trimmed = combined.slice(combined.length - MAX_MSG)
       trimmed = this.dedupSeps(trimmed)
@@ -472,7 +498,7 @@ Page({
       }
       this._lastMsgDay = d
       const lastId = this._nextLastId
-      const dataObj = this.shouldAutoScroll() && lastId && this.data.lastId !== lastId ? { messages: trimmed, lastId } : { messages: trimmed }
+      const dataObj = this.shouldAutoScroll() && lastId && this.data.lastId !== lastId ? { messages: trimmed, lastId, scrollAnim: false } : { messages: trimmed }
       if (!this.shouldAutoScroll()) {
         dataObj.showToBottom = true
         dataObj.unreadCount = (this.data.unreadCount || 0) + addedCount
@@ -520,17 +546,20 @@ Page({
     }
     if (!id) return
     if (this.data.lastId === id) {
-      this.setData({ nearBottom: true, showToBottom: false, unreadCount: 0 })
+      this.setData({ nearBottom: true, showToBottom: false, unreadCount: 0, scrollAnim: false })
       return
     }
-    this.setData({ lastId: id, nearBottom: true, showToBottom: false, unreadCount: 0 })
+    this.setData({ lastId: id, nearBottom: true, showToBottom: false, unreadCount: 0, scrollAnim: true })
+    setTimeout(() => {
+      this.setData({ scrollAnim: false })
+    }, 200)
   },
   onFocusInput() {
     this.scrollToBottom()
   },
   onClear() {
     this._ids = {}
-    this.setData({ messages: [], lastId: '', inputValue: '', focus: true, showToBottom: false, unreadCount: 0, nearBottom: true })
+    this.setData({ messages: [], lastId: '', inputValue: '', focus: true, showToBottom: false, unreadCount: 0, nearBottom: true, scrollAnim: false })
     try { wx.removeStorageSync('messages') } catch (e) {}
     if (this._saveTimer) {
       clearTimeout(this._saveTimer)

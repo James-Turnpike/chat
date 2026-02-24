@@ -3,7 +3,7 @@
     <text class="title">Daze 聊天室</text>
     <text class="clear" bindtap="onClear">清屏</text>
   </view>
-  <scroll-view class="messages" scroll-y="true" scroll-with-animation="{{nearBottom}}" scroll-into-view="{{lastId}}" bindscroll="onScroll" bindscrolltolower="onScrollToLower" lower-threshold="80">
+  <scroll-view class="messages" scroll-y="true" scroll-with-animation="{{scrollAnim}}" scroll-into-view="{{lastId}}" bindscroll="onScroll" bindscrolltolower="onScrollToLower" lower-threshold="80">
     <view wx:if="{{!connected}}" class="status-bar">
       <text>连接中</text><text class="dots">...</text>
     </view>
