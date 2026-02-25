@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+  <title>Daze 聊天室预览</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="page">
+    <div class="header">
+      <div class="title">Daze 聊天室</div>
+      <button id="clear" class="clear">清屏</button>
+    </div>
+    <div id="status" class="status-bar">连接中...</div>
+    <div id="messages" class="messages"></div>
+    <div class="input-bar">
+      <input id="input" class="input" placeholder="输入消息..." maxlength="500">
+      <div id="counter" class="counter">0/500</div>
+      <button id="send" class="send">发送</button>
+    </div>
+  </div>
+  <script src="/client.js"></script>
+</body>
+</html>
