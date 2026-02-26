@@ -45,6 +45,7 @@ Page({
   _lastScrollTop: 0,
   _lastScrollAt: 0,
   _lastMsgDay: '',
+  _sharedDate: new Date(),
 
   onLoad() {
     this.loadColorCache()
@@ -103,7 +104,10 @@ Page({
       this._batchTimer = null
     }
     if (this.socket) {
-      this.socket.close()
+      this.socket.close({
+        code: 1000,
+        reason: 'page unload'
+      })
       this.socket = null
     }
   },
@@ -240,10 +244,13 @@ Page({
       this.handleSocketMessage(res.data)
     })
 
-    const onDisconnect = () => {
+    const onDisconnect = (res) => {
       this.setData({ connected: false })
       this.stopTimers()
       this.scheduleReconnect()
+      if (res && res.errMsg) {
+        console.error('[Socket] Disconnected:', res.errMsg)
+      }
     }
 
     socket.onClose(onDisconnect)
@@ -272,12 +279,16 @@ Page({
 
     const self = msg.nick === this.data.nick
     const meta = this.getAvatarMeta(msg.nick)
-    const timeStr = formatTime(new Date(msg.ts || Date.now()))
-    const day = this.getDayKey(msg.ts)
+    
+    const ts = msg.ts || Date.now()
+    this._sharedDate.setTime(ts)
+    const timeStr = formatTime(this._sharedDate)
+    const day = this.getDayKey(ts)
     
     const entries = []
     if (day && day !== this._lastMsgDay) {
       entries.push({ id: 'sep-' + day, type: 'sep', label: day })
+      this._lastMsgDay = day // 提前更新以防批处理中重复添加
     }
     
     entries.push({
@@ -289,7 +300,7 @@ Page({
       avatarColor: meta.color,
       avatarTextColor: meta.textColor,
       avatarChar: meta.char,
-      ts: msg.ts || Date.now()
+      ts: ts
     })
 
     this._ids[id] = true
@@ -299,9 +310,9 @@ Page({
 
   getDayKey(ts) {
     if (!ts) return ''
-    const d = new Date(ts)
-    const m = (d.getMonth() + 1).toString().padStart(2, '0')
-    const day = d.getDate().toString().padStart(2, '0')
+    this._sharedDate.setTime(ts)
+    const m = (this._sharedDate.getMonth() + 1).toString().padStart(2, '0')
+    const day = this._sharedDate.getDate().toString().padStart(2, '0')
     return `${m}-${day}`
   },
 
@@ -413,13 +424,23 @@ Page({
     
     this._batchQueue = []
     const currentMessages = this.data.messages
-    let combined = this.dedupSeps(currentMessages.concat(queue))
+    
+    // 优化：仅对新加入的消息进行去重处理，避免对全量数组的操作
+    const lastItem = currentMessages[currentMessages.length - 1]
+    let filteredQueue = queue
+    if (lastItem && lastItem.type === 'sep' && queue[0] && queue[0].type === 'sep' && lastItem.label === queue[0].label) {
+      filteredQueue = queue.slice(1)
+    }
+    
+    let combined = currentMessages.concat(filteredQueue)
     
     let addedCount = 0
-    queue.forEach(it => { if (it.type !== 'sep') addedCount++ })
+    filteredQueue.forEach(it => { if (it.type !== 'sep') addedCount++ })
 
     if (combined.length > MAX_MSG) {
       combined = combined.slice(-MAX_MSG)
+      // 如果切片后开头是分隔符，且紧跟着的消息日期相同，则保留（由dedupSeps保证）
+      // 这里为了简单，如果切片后长度依然很大，再做一次全量去重是安全的
       combined = this.dedupSeps(combined)
       this._rebuildIdsMap(combined)
     }
