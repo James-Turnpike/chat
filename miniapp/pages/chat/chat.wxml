@@ -12,6 +12,8 @@
     bindscrolltolower="onScrollToLower" 
     lower-threshold="100"
     enable-back-to-top="true"
+    enhanced="{{true}}"
+    show-scrollbar="{{false}}"
   >
     <view wx:if="{{!connected}}" class="status-bar {{connected ? 'connected' : ''}}">
       <text>{{connected ? '已连接' : '正在连接'}}</text><text wx:if="{{!connected}}" class="dots">...</text>
@@ -62,6 +64,8 @@
       bindinput="onInput"
       bindconfirm="onSend"
       bindfocus="onFocusInput"
+      adjust-position="{{true}}"
+      hold-keyboard="{{true}}"
     />
     <text class="counter {{counterLevel}}" wx:if="{{inputValue.length > 0}}">{{inputValue.length}}/500</text>
     <button class="send {{!inputValue || !connected ? 'disabled' : ''}}" bindtap="onSend" disabled="{{!inputValue || !connected}}">发送</button>

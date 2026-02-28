@@ -50,8 +50,8 @@ Page({
   onLoad() {
     this.loadColorCache()
     const stored = wx.getStorageSync('nick')
-    const nick = stored || '游客' + Math.floor(Math.random() * 1000)
-    wx.setStorageSync('nick', nick)
+    const nick = stored || `游客${Math.floor(Math.random() * 1000)}`
+    if (!stored) wx.setStorageSync('nick', nick)
     this.setData({ nick })
     
     this.loadHistory()
@@ -61,7 +61,7 @@ Page({
 
   initNetworkListener() {
     if (!wx.onNetworkStatusChange) return
-    wx.onNetworkStatusChange(res => {
+    this._onNetworkChange = (res) => {
       const online = !!(res && res.isConnected)
       this._netOnline = online
       if (!online) {
@@ -71,43 +71,33 @@ Page({
         this._reconnectDelay = RECONNECT_BASE
         if (!this.data.connected) this.scheduleReconnect()
       }
-    })
+    }
+    wx.onNetworkStatusChange(this._onNetworkChange)
   },
 
   stopTimers() {
-    if (this._pingTimer) {
-      clearInterval(this._pingTimer)
-      this._pingTimer = null
-    }
-    if (this._reconnectTimer) {
-      clearTimeout(this._reconnectTimer)
-      this._reconnectTimer = null
-    }
+    [this._pingTimer, this._reconnectTimer, this._saveTimer, this._colorSaveTimer, this._batchTimer].forEach(timer => {
+      if (timer) {
+        clearTimeout(timer)
+        clearInterval(timer)
+      }
+    })
+    this._pingTimer = this._reconnectTimer = this._saveTimer = this._colorSaveTimer = this._batchTimer = null
   },
 
   onUnload() {
     this.stopTimers()
-    if (this._saveTimer) {
-      clearTimeout(this._saveTimer)
-      this._saveTimer = null
+    if (this._onNetworkChange && wx.offNetworkStatusChange) {
+      wx.offNetworkStatusChange(this._onNetworkChange)
     }
-    if (this._pendingHistory && Array.isArray(this._pendingHistory)) {
+    
+    if (this._pendingHistory) {
       this.saveHistory(this._pendingHistory)
       this._pendingHistory = null
     }
-    if (this._colorSaveTimer) {
-      clearTimeout(this._colorSaveTimer)
-      this._colorSaveTimer = null
-    }
-    if (this._batchTimer) {
-      clearTimeout(this._batchTimer)
-      this._batchTimer = null
-    }
+
     if (this.socket) {
-      this.socket.close({
-        code: 1000,
-        reason: 'page unload'
-      })
+      this.socket.close({ code: 1000, reason: 'page unload' })
       this.socket = null
     }
   },
@@ -248,8 +238,8 @@ Page({
       this.setData({ connected: false })
       this.stopTimers()
       this.scheduleReconnect()
-      if (res && res.errMsg) {
-        console.error('[Socket] Disconnected:', res.errMsg)
+      if (res && res.errMsg && !res.errMsg.includes('page unload')) {
+        console.error('[Socket] Disconnected:', res)
       }
     }
 
@@ -269,7 +259,10 @@ Page({
     let msg
     try {
       msg = JSON.parse(data)
-    } catch (e) { return }
+    } catch (e) {
+      console.error('[Socket] Parse Error:', e)
+      return
+    }
 
     if (!msg || typeof msg.text !== 'string' || !msg.nick) return
     if (msg.type === 'ping') return
@@ -287,8 +280,8 @@ Page({
     
     const entries = []
     if (day && day !== this._lastMsgDay) {
-      entries.push({ id: 'sep-' + day, type: 'sep', label: day })
-      this._lastMsgDay = day // 提前更新以防批处理中重复添加
+      entries.push({ id: `sep-${day}`, type: 'sep', label: day })
+      this._lastMsgDay = day 
     }
     
     entries.push({
@@ -305,7 +298,7 @@ Page({
 
     this._ids[id] = true
     this._batchQueue.push(...entries)
-    this.scheduleFlush('msg-' + id, day)
+    this.scheduleFlush(`msg-${id}`, day)
   },
 
   getDayKey(ts) {
@@ -330,34 +323,49 @@ Page({
 
   onInput(e) {
     const v = e.detail.value || ''
-    let level = ''
     const len = v.length
+    let level = ''
     if (len > DANGER_THRESHOLD) level = 'danger'
     else if (len > WARN_THRESHOLD) level = 'warn'
     
+    // 只有在值或状态发生变化时才更新，减少 setData
     if (v === this.data.inputValue && level === this.data.counterLevel) return
-    this.setData({ inputValue: v, counterLevel: level })
+    
+    const patch = { inputValue: v, counterLevel: level }
+    this.setData(patch)
   },
 
   onSend() {
     const text = this.data.inputValue.trim()
     if (!text) return
+    
     if (text.length > LENGTH_LIMIT) {
       wx.showToast({ title: '内容过长', icon: 'none' })
       return
     }
+
     if (!this.socket || !this.data.connected) {
       this.showConnectingToast()
       return
     }
+
     const payload = JSON.stringify({ nick: this.data.nick, text })
     try {
-      this.socket.send({ data: payload })
+      this.socket.send({ 
+        data: payload,
+        fail: (err) => {
+          console.error('[Socket] Send Failed:', err)
+          this.showConnectingToast()
+          this.scheduleReconnect()
+        }
+      })
     } catch (e) {
+      console.error('[Socket] Send Error:', e)
       this.showConnectingToast()
       this.scheduleReconnect()
       return
     }
+
     this.setData({ inputValue: '', focus: true, counterLevel: '' })
     if (wx.vibrateShort) wx.vibrateShort()
   },
@@ -425,27 +433,24 @@ Page({
     this._batchQueue = []
     const currentMessages = this.data.messages
     
-    // 优化：仅对新加入的消息进行去重处理，避免对全量数组的操作
+    // 检查是否有重复的分隔符（当新批次的第一个是分隔符且与列表中最后一个相同）
     const lastItem = currentMessages[currentMessages.length - 1]
     let filteredQueue = queue
-    if (lastItem && lastItem.type === 'sep' && queue[0] && queue[0].type === 'sep' && lastItem.label === queue[0].label) {
+    if (lastItem?.type === 'sep' && queue[0]?.type === 'sep' && lastItem.label === queue[0].label) {
       filteredQueue = queue.slice(1)
     }
     
-    let combined = currentMessages.concat(filteredQueue)
-    
-    let addedCount = 0
-    filteredQueue.forEach(it => { if (it.type !== 'sep') addedCount++ })
+    let combined = [...currentMessages, ...filteredQueue]
+    const addedCount = filteredQueue.filter(it => it.type !== 'sep').length
 
+    // 限制最大消息数
     if (combined.length > MAX_MSG) {
       combined = combined.slice(-MAX_MSG)
-      // 如果切片后开头是分隔符，且紧跟着的消息日期相同，则保留（由dedupSeps保证）
-      // 这里为了简单，如果切片后长度依然很大，再做一次全量去重是安全的
       combined = this.dedupSeps(combined)
       this._rebuildIdsMap(combined)
     }
 
-    const lastMsg = combined.slice().reverse().find(it => it.type !== 'sep')
+    const lastMsg = [...combined].reverse().find(it => it.type !== 'sep')
     this._lastMsgDay = lastMsg ? this.getDayKey(lastMsg.ts) : this._lastMsgDay
 
     const patch = this._buildMessagePatch(currentMessages, combined, addedCount)
@@ -462,24 +467,27 @@ Page({
 
   _buildMessagePatch(oldList, newList, addedCount) {
     const patch = {}
-    const isLargeBatch = (newList.length - oldList.length) > LARGE_BATCH
-    const isTrimmed = newList.length <= oldList.length
-
-    if (isLargeBatch || isTrimmed) {
+    const diff = newList.length - oldList.length
+    
+    // 如果是截断（长度减少）或者大批量更新，全量更新 messages
+    if (diff <= 0 || diff > LARGE_BATCH) {
       patch.messages = newList
     } else {
+      // 增量更新，利用小程序 setData 的索引更新特性
       for (let i = oldList.length; i < newList.length; i++) {
         patch[`messages[${i}]`] = newList[i]
       }
     }
 
     const lastId = this._nextLastId
-    if (lastId && this.shouldAutoScroll() && this.data.lastId !== lastId) {
+    const shouldScroll = this.shouldAutoScroll()
+
+    if (lastId && shouldScroll && this.data.lastId !== lastId) {
       patch.lastId = lastId
       patch.scrollAnim = false
     }
 
-    if (!this.shouldAutoScroll()) {
+    if (!shouldScroll) {
       patch.showToBottom = true
       patch.unreadCount = (this.data.unreadCount || 0) + addedCount
     }
