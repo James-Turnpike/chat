@@ -45,7 +45,6 @@ Page({
   _lastScrollTop: 0,
   _lastScrollAt: 0,
   _lastMsgDay: '',
-  _sharedDate: new Date(),
 
   onLoad() {
     this.loadColorCache()
@@ -219,9 +218,9 @@ Page({
       this.socket = null
     }
     
+    this.setData({ connected: false })
     const socket = wx.connectSocket({ url: config.wsUrl })
     this.socket = socket
-    this.setData({ connected: false })
 
     socket.onOpen(() => {
       this.setData({ connected: true, focus: true })
@@ -235,11 +234,13 @@ Page({
     })
 
     const onDisconnect = (res) => {
-      this.setData({ connected: false })
-      this.stopTimers()
-      this.scheduleReconnect()
+      if (this.data.connected) {
+        this.setData({ connected: false })
+        this.stopTimers()
+        this.scheduleReconnect()
+      }
       if (res && res.errMsg && !res.errMsg.includes('page unload')) {
-        console.error('[Socket] Disconnected:', res)
+        console.error('[Socket] Error:', res)
       }
     }
 
@@ -250,7 +251,7 @@ Page({
   showConnectedToast() {
     const now = Date.now()
     if (!this._lastToastAt || now - this._lastToastAt > TOAST_THROTTLE) {
-      wx.showToast({ title: '已连接', icon: 'none' })
+      wx.showToast({ title: '聊天室已就绪', icon: 'success', duration: 1500 })
       this._lastToastAt = now
     }
   },
@@ -264,27 +265,25 @@ Page({
       return
     }
 
-    if (!msg || typeof msg.text !== 'string' || !msg.nick) return
-    if (msg.type === 'ping') return
+    if (!msg || msg.type === 'ping') return
+    if (typeof msg.text !== 'string' || !msg.nick) return
 
     const id = msg.id || Date.now().toString(36)
     if (this._ids[id]) return
 
     const self = msg.nick === this.data.nick
     const meta = this.getAvatarMeta(msg.nick)
-    
     const ts = msg.ts || Date.now()
-    this._sharedDate.setTime(ts)
-    const timeStr = formatTime(this._sharedDate)
+    const timeStr = formatTime(new Date(ts))
     const day = this.getDayKey(ts)
     
-    const entries = []
+    // 如果日期变化，先插入分隔符
     if (day && day !== this._lastMsgDay) {
-      entries.push({ id: `sep-${day}`, type: 'sep', label: day })
+      this._batchQueue.push({ id: `sep-${day}`, type: 'sep', label: day })
       this._lastMsgDay = day 
     }
     
-    entries.push({
+    this._batchQueue.push({
       id,
       nick: msg.nick,
       text: msg.text,
@@ -297,15 +296,14 @@ Page({
     })
 
     this._ids[id] = true
-    this._batchQueue.push(...entries)
-    this.scheduleFlush(`msg-${id}`, day)
+    this.scheduleFlush(`msg-${id}`)
   },
 
   getDayKey(ts) {
     if (!ts) return ''
-    this._sharedDate.setTime(ts)
-    const m = (this._sharedDate.getMonth() + 1).toString().padStart(2, '0')
-    const day = this._sharedDate.getDate().toString().padStart(2, '0')
+    const d = new Date(ts)
+    const m = (d.getMonth() + 1).toString().padStart(2, '0')
+    const day = d.getDate().toString().padStart(2, '0')
     return `${m}-${day}`
   },
 
@@ -336,23 +334,23 @@ Page({
   },
 
   onSend() {
-    const text = this.data.inputValue.trim()
+    const text = (this.data.inputValue || '').trim()
     if (!text) return
     
     if (text.length > LENGTH_LIMIT) {
-      wx.showToast({ title: '内容过长', icon: 'none' })
+      wx.showToast({ title: '内容超长，请精简后再发', icon: 'none' })
       return
     }
 
     if (!this.socket || !this.data.connected) {
       this.showConnectingToast()
+      this.scheduleReconnect()
       return
     }
 
-    const payload = JSON.stringify({ nick: this.data.nick, text })
     try {
       this.socket.send({ 
-        data: payload,
+        data: JSON.stringify({ nick: this.data.nick, text }),
         fail: (err) => {
           console.error('[Socket] Send Failed:', err)
           this.showConnectingToast()
@@ -361,8 +359,6 @@ Page({
       })
     } catch (e) {
       console.error('[Socket] Send Error:', e)
-      this.showConnectingToast()
-      this.scheduleReconnect()
       return
     }
 
@@ -415,9 +411,8 @@ Page({
     }, HISTORY_DEBOUNCE)
   },
 
-  scheduleFlush(lastId, day) {
+  scheduleFlush(lastId) {
     this._nextLastId = lastId
-    this._nextDay = day
     if (!this._batchTimer) {
       this._batchTimer = setTimeout(() => {
         this._batchTimer = null
@@ -433,7 +428,7 @@ Page({
     this._batchQueue = []
     const currentMessages = this.data.messages
     
-    // 检查是否有重复的分隔符（当新批次的第一个是分隔符且与列表中最后一个相同）
+    // 检查并过滤可能的重复日期分隔符
     const lastItem = currentMessages[currentMessages.length - 1]
     let filteredQueue = queue
     if (lastItem?.type === 'sep' && queue[0]?.type === 'sep' && lastItem.label === queue[0].label) {
@@ -441,19 +436,20 @@ Page({
     }
     
     let combined = [...currentMessages, ...filteredQueue]
-    const addedCount = filteredQueue.filter(it => it.type !== 'sep').length
+    const addedMsgCount = filteredQueue.filter(it => it.type !== 'sep').length
 
-    // 限制最大消息数
+    // 限制最大消息数，并重新构建 ID 映射
     if (combined.length > MAX_MSG) {
       combined = combined.slice(-MAX_MSG)
       combined = this.dedupSeps(combined)
       this._rebuildIdsMap(combined)
     }
 
+    // 更新最后一条消息的日期
     const lastMsg = [...combined].reverse().find(it => it.type !== 'sep')
-    this._lastMsgDay = lastMsg ? this.getDayKey(lastMsg.ts) : this._lastMsgDay
+    if (lastMsg) this._lastMsgDay = this.getDayKey(lastMsg.ts)
 
-    const patch = this._buildMessagePatch(currentMessages, combined, addedCount)
+    const patch = this._buildMessagePatch(currentMessages, combined, addedMsgCount)
     this.setData(patch)
     this.scheduleSaveHistory(combined)
   },
@@ -465,31 +461,35 @@ Page({
     })
   },
 
-  _buildMessagePatch(oldList, newList, addedCount) {
+  _buildMessagePatch(oldList, newList, addedMsgCount) {
     const patch = {}
     const diff = newList.length - oldList.length
     
-    // 如果是截断（长度减少）或者大批量更新，全量更新 messages
+    // 1. 更新消息列表
     if (diff <= 0 || diff > LARGE_BATCH) {
+      // 截断或大量更新，使用全量更新
       patch.messages = newList
     } else {
-      // 增量更新，利用小程序 setData 的索引更新特性
+      // 少量增量更新，利用索引优化
       for (let i = oldList.length; i < newList.length; i++) {
         patch[`messages[${i}]`] = newList[i]
       }
     }
 
-    const lastId = this._nextLastId
+    // 2. 自动滚动逻辑
     const shouldScroll = this.shouldAutoScroll()
+    const lastId = this._nextLastId
 
-    if (lastId && shouldScroll && this.data.lastId !== lastId) {
-      patch.lastId = lastId
-      patch.scrollAnim = false
-    }
-
-    if (!shouldScroll) {
+    if (shouldScroll) {
+      // 只有在需要滚动且 ID 发生变化时才更新 lastId
+      if (lastId && this.data.lastId !== lastId) {
+        patch.lastId = lastId
+        patch.scrollAnim = true // 开启滚动动画，体验更佳
+      }
+    } else if (addedMsgCount > 0) {
+      // 不在底部且有新消息，显示提示
       patch.showToBottom = true
-      patch.unreadCount = (this.data.unreadCount || 0) + addedCount
+      patch.unreadCount = (this.data.unreadCount || 0) + addedMsgCount
     }
 
     return patch
