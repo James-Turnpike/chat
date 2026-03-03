@@ -1,6 +1,6 @@
 const config = require('../../utils/config')
 const { getAvatarColor, getAvatarTextColor } = require('../../utils/color')
-const { formatTime } = require('../../utils/format')
+const { formatTime, getDayKey } = require('../../utils/format')
 
 const MAX_MSG = 200
 const LENGTH_LIMIT = 500
@@ -48,14 +48,17 @@ Page({
 
   onLoad() {
     this.loadColorCache()
+    this.initNick()
+    this.loadHistory()
+    this.connect()
+    this.initNetworkListener()
+  },
+
+  initNick() {
     const stored = wx.getStorageSync('nick')
     const nick = stored || `游客${Math.floor(Math.random() * 1000)}`
     if (!stored) wx.setStorageSync('nick', nick)
     this.setData({ nick })
-    
-    this.loadHistory()
-    this.connect()
-    this.initNetworkListener()
   },
 
   initNetworkListener() {
@@ -257,34 +260,45 @@ Page({
   },
 
   handleSocketMessage(data) {
+    const msg = this.parseAndValidateMessage(data)
+    if (!msg) return
+
+    this.addMessageToBatch(msg)
+  },
+
+  parseAndValidateMessage(data) {
     let msg
     try {
       msg = JSON.parse(data)
     } catch (e) {
       console.error('[Socket] Parse Error:', e)
-      return
+      return null
     }
 
-    if (!msg || msg.type === 'ping') return
-    if (typeof msg.text !== 'string' || !msg.nick) return
+    if (!msg || msg.type === 'ping') return null
+    if (typeof msg.text !== 'string' || !msg.nick) return null
 
     const id = msg.id || Date.now().toString(36)
-    if (this._ids[id]) return
+    if (this._ids[id]) return null
+    this._ids[id] = true
 
+    return msg
+  },
+
+  addMessageToBatch(msg) {
     const self = msg.nick === this.data.nick
     const meta = this.getAvatarMeta(msg.nick)
     const ts = msg.ts || Date.now()
     const timeStr = formatTime(new Date(ts))
     const day = this.getDayKey(ts)
-    
-    // 如果日期变化，先插入分隔符
+
     if (day && day !== this._lastMsgDay) {
       this._batchQueue.push({ id: `sep-${day}`, type: 'sep', label: day })
-      this._lastMsgDay = day 
+      this._lastMsgDay = day
     }
-    
+
     this._batchQueue.push({
-      id,
+      id: msg.id,
       nick: msg.nick,
       text: msg.text,
       time: timeStr,
@@ -295,17 +309,10 @@ Page({
       ts: ts
     })
 
-    this._ids[id] = true
-    this.scheduleFlush(`msg-${id}`)
+    this.scheduleFlush(`msg-${msg.id}`)
   },
 
-  getDayKey(ts) {
-    if (!ts) return ''
-    const d = new Date(ts)
-    const m = (d.getMonth() + 1).toString().padStart(2, '0')
-    const day = d.getDate().toString().padStart(2, '0')
-    return `${m}-${day}`
-  },
+
 
   scheduleReconnect() {
     if (this._reconnectTimer) return
@@ -321,16 +328,16 @@ Page({
 
   onInput(e) {
     const v = e.detail.value || ''
+    this.setData({ inputValue: v })
+
     const len = v.length
     let level = ''
     if (len > DANGER_THRESHOLD) level = 'danger'
     else if (len > WARN_THRESHOLD) level = 'warn'
     
-    // 只有在值或状态发生变化时才更新，减少 setData
-    if (v === this.data.inputValue && level === this.data.counterLevel) return
-    
-    const patch = { inputValue: v, counterLevel: level }
-    this.setData(patch)
+    if (level !== this.data.counterLevel) {
+      this.setData({ counterLevel: level })
+    }
   },
 
   onSend() {
@@ -422,72 +429,61 @@ Page({
   },
 
   flushMessages() {
+    if (!this._batchQueue.length) return
+
+    const newMessages = this.processMessageQueue()
+    const patch = this.createMessagesPatch(newMessages)
+
+    this.setData(patch)
+    this.scheduleSaveHistory(newMessages)
+  },
+
+  processMessageQueue() {
     const queue = this._batchQueue
-    if (!queue.length) return
-    
     this._batchQueue = []
+
     const currentMessages = this.data.messages
-    
-    // 检查并过滤可能的重复日期分隔符
     const lastItem = currentMessages[currentMessages.length - 1]
+
     let filteredQueue = queue
     if (lastItem?.type === 'sep' && queue[0]?.type === 'sep' && lastItem.label === queue[0].label) {
       filteredQueue = queue.slice(1)
     }
-    
-    let combined = [...currentMessages, ...filteredQueue]
-    const addedMsgCount = filteredQueue.filter(it => it.type !== 'sep').length
 
-    // 限制最大消息数，并重新构建 ID 映射
+    let combined = [...currentMessages, ...filteredQueue]
+
     if (combined.length > MAX_MSG) {
       combined = combined.slice(-MAX_MSG)
-      combined = this.dedupSeps(combined)
       this._rebuildIdsMap(combined)
     }
 
-    // 更新最后一条消息的日期
     const lastMsg = [...combined].reverse().find(it => it.type !== 'sep')
     if (lastMsg) this._lastMsgDay = this.getDayKey(lastMsg.ts)
 
-    const patch = this._buildMessagePatch(currentMessages, combined, addedMsgCount)
-    this.setData(patch)
-    this.scheduleSaveHistory(combined)
+    return this.dedupSeps(combined)
   },
 
-  _rebuildIdsMap(list) {
-    this._ids = {}
-    list.forEach(it => {
-      if (it.id && it.type !== 'sep') this._ids[it.id] = true
-    })
-  },
-
-  _buildMessagePatch(oldList, newList, addedMsgCount) {
+  createMessagesPatch(newMessages) {
     const patch = {}
-    const diff = newList.length - oldList.length
-    
-    // 1. 更新消息列表
+    const oldMessages = this.data.messages
+    const diff = newMessages.length - oldMessages.length
+
     if (diff <= 0 || diff > LARGE_BATCH) {
-      // 截断或大量更新，使用全量更新
-      patch.messages = newList
+      patch.messages = newMessages
     } else {
-      // 少量增量更新，利用索引优化
-      for (let i = oldList.length; i < newList.length; i++) {
-        patch[`messages[${i}]`] = newList[i]
+      for (let i = oldMessages.length; i < newMessages.length; i++) {
+        patch[`messages[${i}]`] = newMessages[i]
       }
     }
 
-    // 2. 自动滚动逻辑
-    const shouldScroll = this.shouldAutoScroll()
-    const lastId = this._nextLastId
-
-    if (shouldScroll) {
-      // 只有在需要滚动且 ID 发生变化时才更新 lastId
+    const addedMsgCount = diff > 0 ? diff : 0
+    if (this.shouldAutoScroll()) {
+      const lastId = this._nextLastId
       if (lastId && this.data.lastId !== lastId) {
         patch.lastId = lastId
-        patch.scrollAnim = true // 开启滚动动画，体验更佳
+        patch.scrollAnim = true
       }
     } else if (addedMsgCount > 0) {
-      // 不在底部且有新消息，显示提示
       patch.showToBottom = true
       patch.unreadCount = (this.data.unreadCount || 0) + addedMsgCount
     }

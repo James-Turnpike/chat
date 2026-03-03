@@ -5,6 +5,14 @@ function formatTime(date) {
   return `${h}:${m}`
 }
 
+function getDayKey(ts) {
+  if (!ts) return ''
+  const d = new Date(ts)
+  const m = (d.getMonth() + 1).toString().padStart(2, '0')
+  const day = d.getDate().toString().padStart(2, '0')
+  return `${m}-${day}`
+}
+
 function getRelativeTime(timestamp) {
   const now = Date.now()
   const diff = now - timestamp
@@ -16,5 +24,6 @@ function getRelativeTime(timestamp) {
 
 module.exports = {
   formatTime,
-  getRelativeTime
+  getRelativeTime,
+  getDayKey
 }
