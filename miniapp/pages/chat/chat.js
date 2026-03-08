@@ -67,7 +67,9 @@ Page({
       const online = !!(res && res.isConnected)
       this._netOnline = online
       if (!online) {
-        this.setData({ connected: false })
+        if (this.data.connected) {
+          this.setData({ connected: false })
+        }
         this.stopTimers()
       } else {
         this._reconnectDelay = RECONNECT_BASE
@@ -194,16 +196,26 @@ Page({
 
   loadColorCache() {
     try {
-      const cache = wx.getStorageSync('colorCache')
-      this._colorCache = cache || {}
+      const data = wx.getStorageSync('colorCache')
+      if (data && data.cache) {
+        this._colorCache = data.cache
+        this._colorOrder = data.order || []
+      } else {
+        this._colorCache = data || {}
+        this._colorOrder = Object.keys(this._colorCache)
+      }
     } catch (e) {
       this._colorCache = {}
+      this._colorOrder = []
     }
   },
 
   saveColorCache() {
     try {
-      wx.setStorageSync('colorCache', this._colorCache)
+      wx.setStorageSync('colorCache', {
+        cache: this._colorCache,
+        order: this._colorOrder
+      })
     } catch (e) {}
   },
 
@@ -221,7 +233,9 @@ Page({
       this.socket = null
     }
     
-    this.setData({ connected: false })
+    if (this.data.connected) {
+      this.setData({ connected: false })
+    }
     const socket = wx.connectSocket({ url: config.wsUrl })
     this.socket = socket
 
@@ -290,7 +304,7 @@ Page({
     const meta = this.getAvatarMeta(msg.nick)
     const ts = msg.ts || Date.now()
     const timeStr = formatTime(new Date(ts))
-    const day = this.getDayKey(ts)
+    const day = getDayKey(ts)
 
     if (day && day !== this._lastMsgDay) {
       this._batchQueue.push({ id: `sep-${day}`, type: 'sep', label: day })
@@ -328,7 +342,7 @@ Page({
 
   onInput(e) {
     const v = e.detail.value || ''
-    this.setData({ inputValue: v })
+    const patch = { inputValue: v }
 
     const len = v.length
     let level = ''
@@ -336,8 +350,9 @@ Page({
     else if (len > WARN_THRESHOLD) level = 'warn'
     
     if (level !== this.data.counterLevel) {
-      this.setData({ counterLevel: level })
+      patch.counterLevel = level
     }
+    this.setData(patch)
   },
 
   onSend() {
@@ -396,7 +411,7 @@ Page({
         if (it.id && it.type !== 'sep') this._ids[it.id] = true
       })
       
-      this._lastMsgDay = lastMsg ? this.getDayKey(lastMsg.ts) : ''
+      this._lastMsgDay = lastMsg ? getDayKey(lastMsg.ts) : ''
     } catch (e) {}
   },
 
@@ -458,9 +473,16 @@ Page({
     }
 
     const lastMsg = [...combined].reverse().find(it => it.type !== 'sep')
-    if (lastMsg) this._lastMsgDay = this.getDayKey(lastMsg.ts)
+    if (lastMsg) this._lastMsgDay = getDayKey(lastMsg.ts)
 
     return this.dedupSeps(combined)
+  },
+
+  _rebuildIdsMap(list) {
+    this._ids = {}
+    list.forEach(it => {
+      if (it.id && it.type !== 'sep') this._ids[it.id] = true
+    })
   },
 
   createMessagesPatch(newMessages) {
@@ -468,9 +490,9 @@ Page({
     const oldMessages = this.data.messages
     const diff = newMessages.length - oldMessages.length
 
-    if (diff <= 0 || diff > LARGE_BATCH) {
+    if (diff > LARGE_BATCH || (diff <= 0 && newMessages.length !== oldMessages.length)) {
       patch.messages = newMessages
-    } else {
+    } else if (diff > 0) {
       for (let i = oldMessages.length; i < newMessages.length; i++) {
         patch[`messages[${i}]`] = newMessages[i]
       }
