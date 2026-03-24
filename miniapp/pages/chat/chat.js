@@ -63,13 +63,10 @@ Page({
 
   initNetworkListener() {
     if (!wx.onNetworkStatusChange) return
-    this._onNetworkChange = (res) => {
-      const online = !!(res && res.isConnected)
-      this._netOnline = online
-      if (!online) {
-        if (this.data.connected) {
-          this.setData({ connected: false })
-        }
+    this._onNetworkChange = ({ isConnected }) => {
+      this._netOnline = !!isConnected
+      if (!isConnected) {
+        if (this.data.connected) this.setData({ connected: false })
         this.stopTimers()
       } else {
         this._reconnectDelay = RECONNECT_BASE
@@ -79,14 +76,25 @@ Page({
     wx.onNetworkStatusChange(this._onNetworkChange)
   },
 
+  _clearTimer(name) {
+    if (this[name]) {
+      clearTimeout(this[name])
+      clearInterval(this[name])
+      this[name] = null
+    }
+  },
+
   stopTimers() {
-    [this._pingTimer, this._reconnectTimer, this._saveTimer, this._colorSaveTimer, this._batchTimer].forEach(timer => {
-      if (timer) {
-        clearTimeout(timer)
-        clearInterval(timer)
-      }
-    })
-    this._pingTimer = this._reconnectTimer = this._saveTimer = this._colorSaveTimer = this._batchTimer = null
+    ['_pingTimer', '_reconnectTimer', '_saveTimer', '_colorSaveTimer', '_batchTimer'].forEach(this._clearTimer.bind(this))
+  },
+
+  _throttleToast(title, key, icon = 'none') {
+    const now = Date.now()
+    const lastKey = `_lastToast_${key}`
+    if (!this[lastKey] || now - this[lastKey] > TOAST_THROTTLE) {
+      wx.showToast({ title, icon, duration: 1500 })
+      this[lastKey] = now
+    }
   },
 
   onUnload() {
@@ -188,7 +196,8 @@ Page({
     const idx = orderArray.indexOf(key)
     if (idx >= 0) orderArray.splice(idx, 1)
     orderArray.push(key)
-    if (orderArray.length > maxSize) {
+    
+    while (orderArray.length > maxSize) {
       const oldKey = orderArray.shift()
       if (oldKey && cacheObject) delete cacheObject[oldKey]
     }
@@ -228,14 +237,14 @@ Page({
   },
 
   connect() {
+    this._clearTimer('_reconnectTimer')
     if (this.socket) {
       this.socket.close()
       this.socket = null
     }
     
-    if (this.data.connected) {
-      this.setData({ connected: false })
-    }
+    if (this.data.connected) this.setData({ connected: false })
+
     const socket = wx.connectSocket({ url: config.wsUrl })
     this.socket = socket
 
@@ -246,9 +255,7 @@ Page({
       this.startPing()
     })
 
-    socket.onMessage(res => {
-      this.handleSocketMessage(res.data)
-    })
+    socket.onMessage(res => this.handleSocketMessage(res.data))
 
     const onDisconnect = (res) => {
       if (this.data.connected) {
@@ -257,7 +264,7 @@ Page({
         this.scheduleReconnect()
       }
       if (res && res.errMsg && !res.errMsg.includes('page unload')) {
-        console.error('[Socket] Error:', res)
+        console.error('[Socket] Disconnected:', res)
       }
     }
 
@@ -266,11 +273,7 @@ Page({
   },
 
   showConnectedToast() {
-    const now = Date.now()
-    if (!this._lastToastAt || now - this._lastToastAt > TOAST_THROTTLE) {
-      wx.showToast({ title: '聊天室已就绪', icon: 'success', duration: 1500 })
-      this._lastToastAt = now
-    }
+    this._throttleToast('聊天室已就绪', 'ready', 'success')
   },
 
   handleSocketMessage(data) {
@@ -330,13 +333,11 @@ Page({
 
   scheduleReconnect() {
     if (this._reconnectTimer) return
-    const base = this._reconnectDelay || RECONNECT_BASE
-    const jitter = base * (0.8 + Math.random() * 0.4)
+    const jitter = (this._reconnectDelay || RECONNECT_BASE) * (0.8 + Math.random() * 0.4)
     this._reconnectTimer = setTimeout(() => {
       this._reconnectTimer = null
       this.connect()
-      const next = Math.min(Math.round(base * 1.5), RECONNECT_MAX)
-      this._reconnectDelay = next
+      this._reconnectDelay = Math.min(Math.round((this._reconnectDelay || RECONNECT_BASE) * 1.5), RECONNECT_MAX)
     }, Math.round(jitter))
   },
 
@@ -389,11 +390,7 @@ Page({
   },
 
   showConnectingToast() {
-    const now = Date.now()
-    if (!this._lastConnectToastAt || now - this._lastConnectToastAt > TOAST_THROTTLE) {
-      wx.showToast({ title: '正在连接...', icon: 'none' })
-      this._lastConnectToastAt = now
-    }
+    this._throttleToast('正在连接...', 'connecting')
   },
 
   loadHistory() {
@@ -457,7 +454,7 @@ Page({
     const queue = this._batchQueue
     this._batchQueue = []
 
-    const currentMessages = this.data.messages
+    const { messages: currentMessages } = this.data
     const lastItem = currentMessages[currentMessages.length - 1]
 
     let filteredQueue = queue
@@ -486,10 +483,11 @@ Page({
   },
 
   createMessagesPatch(newMessages) {
+    const { messages: oldMessages, lastId: oldLastId, unreadCount: oldUnreadCount } = this.data
     const patch = {}
-    const oldMessages = this.data.messages
     const diff = newMessages.length - oldMessages.length
 
+    // 智能更新消息列表
     if (diff > LARGE_BATCH || (diff <= 0 && newMessages.length !== oldMessages.length)) {
       patch.messages = newMessages
     } else if (diff > 0) {
@@ -498,16 +496,16 @@ Page({
       }
     }
 
-    const addedMsgCount = diff > 0 ? diff : 0
+    const addedMsgCount = Math.max(0, diff)
     if (this.shouldAutoScroll()) {
       const lastId = this._nextLastId
-      if (lastId && this.data.lastId !== lastId) {
+      if (lastId && oldLastId !== lastId) {
         patch.lastId = lastId
         patch.scrollAnim = true
       }
     } else if (addedMsgCount > 0) {
       patch.showToBottom = true
-      patch.unreadCount = (this.data.unreadCount || 0) + addedMsgCount
+      patch.unreadCount = (oldUnreadCount || 0) + addedMsgCount
     }
 
     return patch
